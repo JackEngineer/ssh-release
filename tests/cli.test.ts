@@ -5,7 +5,12 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
 
-import { isCliEntrypoint, runCli, type DeployCliOptions } from '../src/cli.js';
+import {
+  isCliEntrypoint,
+  runCli,
+  type DeployCliOptions,
+  type RollbackCliOptions,
+} from '../src/cli.js';
 
 test('prints help and version without running command handlers', async () => {
   const stdout: string[] = [];
@@ -32,6 +37,8 @@ test('prints help and version without running command handlers', async () => {
 
   assert.equal(stdout.some((line) => line.includes('ssh-release deploy --dry-run')), true);
   assert.equal(stdout.some((line) => line.includes('ssh-release deploy --plan')), true);
+  assert.equal(stdout.some((line) => line.includes('ssh-release rollback [version] --dry-run')), true);
+  assert.equal(stdout.some((line) => line.includes('ssh-release rollback [version] --plan')), true);
   assert.equal(stdout.includes(packageJson.version), true);
   assert.deepEqual(stderr, []);
 });
@@ -300,6 +307,174 @@ test('accepts deploy --plan as a dry-run preview alias', async () => {
   }), 0);
 
   assert.deepEqual(receivedOptions, [{ dryRun: true }]);
+});
+
+test('passes dry-run option to rollback handler and prints rollback plan', async () => {
+  const stdout: string[] = [];
+  const receivedCalls: unknown[] = [];
+
+  assert.equal(await runCli(['rollback', '20260625-120000', '--dry-run'], {
+    io: {
+      log: (message: string) => stdout.push(message),
+      error: () => undefined,
+    },
+    handlers: {
+      ...createFailingHandlers(),
+      rollback: async (version?: string, options?: RollbackCliOptions) => {
+        receivedCalls.push({ version, options });
+        return {
+          dryRun: true as const,
+          mode: 'release' as const,
+          version: '20260625-120000',
+          requestedVersion: '20260625-120000',
+          currentVersion: '20260625-122000',
+          targetPath: '/var/www/site/releases/20260625-120000',
+          currentSymlink: '/var/www/site/current',
+          switch: {
+            currentSymlink: '/var/www/site/current',
+            from: 'releases/20260625-122000',
+            target: 'releases/20260625-120000',
+          },
+          cleanup: {
+            lockPath: '/var/www/site/.ssh-release.lock',
+            oldReleases: '回滚只切换 current，不删除任何版本目录',
+          },
+          verification: [
+            '远端锁未占用',
+            '目标版本目录存在',
+            'current 将指向目标版本',
+          ],
+        };
+      },
+    },
+  }), 0);
+
+  assert.deepEqual(receivedCalls, [
+    {
+      version: '20260625-120000',
+      options: { dryRun: true },
+    },
+  ]);
+  assert.equal(stdout.includes('回滚预检通过，不会修改远程服务器'), true);
+  assert.equal(stdout.includes('当前版本: 20260625-122000'), true);
+  assert.equal(stdout.includes('目标版本: 20260625-120000'), true);
+  assert.equal(stdout.includes('计划切换: /var/www/site/current: releases/20260625-122000 -> releases/20260625-120000'), true);
+  assert.equal(stdout.includes('计划清理: 回滚只切换 current，不删除任何版本目录'), true);
+  assert.equal(stdout.includes('计划校验: 远端锁未占用'), true);
+});
+
+test('accepts rollback --plan as a dry-run preview alias', async () => {
+  const receivedCalls: unknown[] = [];
+
+  assert.equal(await runCli(['rollback', '--plan'], {
+    io: {
+      log: () => undefined,
+      error: () => undefined,
+    },
+    handlers: {
+      ...createFailingHandlers(),
+      rollback: async (version?: string, options?: RollbackCliOptions) => {
+        receivedCalls.push({ version, options });
+        return {
+          dryRun: true as const,
+          mode: 'release' as const,
+          version: '20260625-121000',
+          currentVersion: '20260625-122000',
+          targetPath: '/var/www/site/releases/20260625-121000',
+          currentSymlink: '/var/www/site/current',
+          switch: {
+            currentSymlink: '/var/www/site/current',
+            from: 'releases/20260625-122000',
+            target: 'releases/20260625-121000',
+          },
+          cleanup: {
+            lockPath: '/var/www/site/.ssh-release.lock',
+            oldReleases: '回滚只切换 current，不删除任何版本目录',
+          },
+          verification: [
+            '远端锁未占用',
+            '目标版本目录存在',
+            'current 将指向目标版本',
+          ],
+        };
+      },
+    },
+  }), 0);
+
+  assert.deepEqual(receivedCalls, [
+    {
+      version: undefined,
+      options: { dryRun: true },
+    },
+  ]);
+});
+
+test('prints rollback plan as a single json object', async () => {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+
+  assert.equal(await runCli(['rollback', '20260625-120000', '--plan', '--json'], {
+    io: {
+      log: (message: string) => stdout.push(message),
+      error: (message: string) => stderr.push(message),
+    },
+    handlers: {
+      ...createFailingHandlers(),
+      rollback: async () => ({
+        dryRun: true as const,
+        mode: 'release' as const,
+        version: '20260625-120000',
+        requestedVersion: '20260625-120000',
+        currentVersion: '20260625-122000',
+        targetPath: '/var/www/site/releases/20260625-120000',
+        currentSymlink: '/var/www/site/current',
+        switch: {
+          currentSymlink: '/var/www/site/current',
+          from: 'releases/20260625-122000',
+          target: 'releases/20260625-120000',
+        },
+        cleanup: {
+          lockPath: '/var/www/site/.ssh-release.lock',
+          oldReleases: '回滚只切换 current，不删除任何版本目录',
+        },
+        verification: [
+          '远端锁未占用',
+          '目标版本目录存在',
+          'current 将指向目标版本',
+        ],
+      }),
+    },
+  }), 0);
+
+  assert.equal(stdout.length, 1);
+  assert.deepEqual(JSON.parse(stdout[0]), {
+    ok: true,
+    command: 'rollback',
+    result: {
+      dryRun: true,
+      mode: 'release',
+      version: '20260625-120000',
+      requestedVersion: '20260625-120000',
+      currentVersion: '20260625-122000',
+      targetPath: '/var/www/site/releases/20260625-120000',
+      currentSymlink: '/var/www/site/current',
+      switch: {
+        currentSymlink: '/var/www/site/current',
+        from: 'releases/20260625-122000',
+        target: 'releases/20260625-120000',
+      },
+      cleanup: {
+        lockPath: '/var/www/site/.ssh-release.lock',
+        oldReleases: '回滚只切换 current，不删除任何版本目录',
+      },
+      verification: [
+        '远端锁未占用',
+        '目标版本目录存在',
+        'current 将指向目标版本',
+      ],
+    },
+  });
+  assert.deepEqual(stderr, []);
 });
 
 test('prints command results as a single json object', async () => {

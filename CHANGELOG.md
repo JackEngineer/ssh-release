@@ -5,6 +5,7 @@
 ### Added
 
 - 增强 `deploy --dry-run` 并新增 `deploy --plan`，预览上传、manifest、切换、清理和校验计划。
+- 增强 `rollback --dry-run` 并新增 `rollback --plan`，预览回滚目标、`current` 切换和校验项。
 - 增加发布 manifest，发布时生成并上传 `manifest.json`，记录文件清单、大小和 SHA-256。
 - 增强发布后校验，远端 `manifest.json` 会进行 hash 校验。
 

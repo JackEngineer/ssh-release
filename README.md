@@ -19,6 +19,7 @@
 - `--json`：输出单行 JSON，便于 CI/CD 解析。
 - `deploy --json --progress`：发布时输出 NDJSON 阶段进度，便于 CI/CD 展示实时状态。
 - `deploy --plan`：不连接远端、不修改服务器，预览上传、切换、清理和校验计划。
+- `rollback --plan`：连接远端读取版本状态，但不修改服务器，预览回滚切换计划。
 - 发布 manifest：每次发布生成 `manifest.json`，记录版本、发布时间、本地来源、文件清单、文件大小和 SHA-256。
 - 发布后远端校验：确认版本目录或目标目录存在、`current` 已指向新版本、`manifest.json` hash 匹配、远端锁已清理。
 - `release` 模式：上传压缩包、远端解压、切换 `current`、清理旧版本。
@@ -250,6 +251,20 @@ ssh-release rollback
 ```bash
 ssh-release rollback 20260625-150000
 ```
+
+需要先查看回滚计划但不切换 `current` 时：
+
+```bash
+ssh-release rollback [version] --dry-run
+ssh-release rollback [version] --plan
+```
+
+`rollback --dry-run` 和 `rollback --plan` 会连接远端读取锁状态、版本列表和当前版本，但不会创建锁、不会切换 `current`、不会删除任何版本目录。预览会显示：
+
+- 当前版本和目标版本。
+- 将切换的 `current` 路径和目标。
+- 回滚不会删除版本目录。
+- 实际回滚前需要满足的校验项。
 
 `overwrite` 模式没有版本列表，也不支持回滚。
 

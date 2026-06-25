@@ -14,6 +14,8 @@
 - `ssh-release deploy --json --progress [--config <path>]`
 - `ssh-release list [--config <path>]`
 - `ssh-release rollback [version] [--config <path>]`
+- `ssh-release rollback [version] --dry-run [--config <path>]`
+- `ssh-release rollback [version] --plan [--config <path>]`
 - `ssh-release unlock [--confirm <lock-path>] [--config <path>]`
 - `ssh-release --help`
 - `ssh-release --version`
@@ -23,8 +25,8 @@
 - `--config <path>`：使用自定义配置文件。
 - `--json`：输出可机器解析的 JSON。
 - `--progress`：仅用于 `deploy --json --progress`，输出 NDJSON 阶段事件。
-- `--dry-run`：只生成发布计划，不连接远端、不修改远端。
-- `--plan`：`deploy` 的发布计划预览别名，行为等同 `--dry-run`。
+- `--dry-run`：生成计划预览，不执行发布或回滚修改。
+- `--plan`：计划预览别名，行为等同 `--dry-run`。
 - `--confirm <lock-path>`：显式确认要删除的远端锁路径。
 
 ## 退出码
@@ -97,6 +99,15 @@
 - `switch`：`release` 模式下将切换的 `current` 路径和目标。
 - `cleanup`：远端锁路径、远端临时压缩包路径和版本保留策略。
 - `verification`：发布后将执行的校验项。
+
+`rollback --dry-run` 和 `rollback --plan` 会连接远端读取锁状态、版本列表和当前版本，但不会创建锁、不会切换 `current`、不会删除版本目录。结果包含：
+
+- `currentVersion`：当前 `current` 指向的版本。
+- `version`：计划回滚到的目标版本。
+- `targetPath`：目标版本目录。
+- `switch`：将切换的 `current` 路径、当前指向和目标指向。
+- `cleanup`：远端锁路径，以及回滚不删除版本目录的说明。
+- `verification`：实际回滚前需要满足的校验项。
 
 ## 配置契约
 

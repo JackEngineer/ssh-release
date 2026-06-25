@@ -13,7 +13,7 @@ import {
   type DeployProgressEvent,
   type DeployResult,
 } from './release.js';
-import { rollback, type RollbackResult } from './rollback.js';
+import { createRollbackPlan, rollback, type RollbackPlan, type RollbackResult } from './rollback.js';
 import { createRemoteClient } from './ssh.js';
 import { unlock, type UnlockResult } from './unlock.js';
 
@@ -27,6 +27,10 @@ export interface DeployCliOptions {
   onProgress?: (event: DeployProgressEvent) => void | Promise<void>;
 }
 
+export interface RollbackCliOptions {
+  dryRun?: boolean;
+}
+
 export interface UnlockCliOptions {
   confirmPath?: string;
 }
@@ -34,7 +38,7 @@ export interface UnlockCliOptions {
 export interface CliHandlers {
   init: () => Promise<void>;
   deploy: (options?: DeployCliOptions) => Promise<DeployResult | DeployPlan>;
-  rollback: (version?: string) => Promise<RollbackResult>;
+  rollback: (version?: string, options?: RollbackCliOptions) => Promise<RollbackResult | RollbackPlan>;
   list: () => Promise<ListReleasesResult>;
   doctor: () => Promise<DoctorReport>;
   unlock: (options?: UnlockCliOptions) => Promise<UnlockResult>;
@@ -130,7 +134,7 @@ export async function runCli(
     }
 
     if (command === 'rollback') {
-      const result = await handlers.rollback(args[0]);
+      const result = await handlers.rollback(args[0], { dryRun: parsed.dryRun });
 
       if (parsed.json) {
         printJsonResult('rollback', result, 0, io);
@@ -332,8 +336,13 @@ function createDefaultHandlers(configPath: string): CliHandlers {
         onProgress: options?.onProgress,
       });
     },
-    rollback: async (version) => {
+    rollback: async (version, options) => {
       const config = await loadConfigFile(configPath);
+
+      if (options?.dryRun) {
+        return createRollbackPlan(config, createRemoteClient(config), version);
+      }
+
       return rollback(config, createRemoteClient(config), version);
     },
     list: async () => {
@@ -411,7 +420,22 @@ function printDeployResult(result: DeployResult | DeployPlan, io: CliIo): void {
   }
 }
 
-function printRollbackResult(result: RollbackResult, io: CliIo): void {
+function printRollbackResult(result: RollbackResult | RollbackPlan, io: CliIo): void {
+  if ('dryRun' in result) {
+    io.log('回滚预检通过，不会修改远程服务器');
+    io.log(`当前版本: ${result.currentVersion}`);
+    io.log(`目标版本: ${result.version}`);
+    io.log(`目标目录: ${result.targetPath}`);
+    io.log(`计划切换: ${result.switch.currentSymlink}: ${result.switch.from} -> ${result.switch.target}`);
+    io.log(`计划清理: ${result.cleanup.oldReleases}`);
+
+    for (const verification of result.verification) {
+      io.log(`计划校验: ${verification}`);
+    }
+
+    return;
+  }
+
   io.log(`已回滚到版本: ${result.version}`);
   io.log(`当前指向: ${result.currentSymlink}`);
 
@@ -508,6 +532,8 @@ function createUsageText(): string {
   ssh-release deploy --json --progress [--config <path>]
   ssh-release list [--config <path>]
   ssh-release rollback [version] [--config <path>]
+  ssh-release rollback [version] --dry-run [--config <path>]
+  ssh-release rollback [version] --plan [--config <path>]
   ssh-release unlock [--confirm <lock-path>] [--config <path>]
   ssh-release <command> --json
   ssh-release --help

@@ -46,6 +46,7 @@ test('documents stable CLI, JSON, config, and safety contracts for 1.0', async (
   assert.match(guide, /1\.0\.0/);
   assert.match(guide, /ssh-release deploy --json --progress/);
   assert.match(guide, /ssh-release deploy --plan/);
+  assert.match(guide, /ssh-release rollback \[version\] --plan/);
   assert.match(guide, /"ok": true/);
   assert.match(guide, /"verified": true/);
   assert.match(guide, /manifest\.json/);
@@ -63,6 +64,7 @@ test('documents stable CLI, JSON, config, and safety contracts for 1.0', async (
   assert.match(readme, /当前版本已进入 1\.0 稳定版/);
   assert.match(readme, /发布 manifest/);
   assert.match(readme, /ssh-release deploy --plan/);
+  assert.match(readme, /ssh-release rollback \[version\] --plan/);
   assert.match(readme, /manifest\.json/);
   assert.match(readme, /docs\/contracts\.md/);
 });
