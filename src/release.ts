@@ -36,6 +36,8 @@ export interface DeployOptions {
   createPackage?: (options: CreateReleasePackageOptions) => Promise<ReleasePackage>;
 }
 
+const deployLockDir = '.ssh-release.lock';
+
 export function createVersionName(date = new Date()): string {
   return [
     date.getFullYear().toString(),
@@ -80,20 +82,54 @@ export async function deploy(
 
   const versionName = createVersionName(options.now ?? new Date());
   const packageFactory = options.createPackage ?? createReleasePackage;
-  const releasePackage = await packageFactory({
-    sourcePath: config.source.path,
-    exclude: config.source.exclude,
-    versionName,
-  });
+  const lockPath = remoteJoin(config.target.path, deployLockDir);
+  const releaseLock = await acquireRemoteDeployLock(config, client, lockPath);
+  let releasePackage: ReleasePackage | undefined;
+  let result: DeployResult | undefined;
+  let deployError: unknown;
+  let cleanupError: unknown;
 
   try {
+    releasePackage = await packageFactory({
+      sourcePath: config.source.path,
+      exclude: config.source.exclude,
+      versionName,
+    });
+
     if (config.deploy.mode === 'overwrite') {
-      return await deployOverwrite(config, client, releasePackage, versionName);
+      result = await deployOverwrite(config, client, releasePackage, versionName);
+      return result;
     }
 
-    return await deployRelease(config, client, releasePackage, versionName);
+    result = await deployRelease(config, client, releasePackage, versionName);
+    return result;
+  } catch (error) {
+    deployError = error;
+    throw error;
   } finally {
-    await releasePackage.cleanup();
+    if (releasePackage) {
+      try {
+        await releasePackage.cleanup();
+      } catch (error) {
+        cleanupError = error;
+      }
+    }
+
+    try {
+      await releaseLock();
+    } catch (error) {
+      const message = `远程发布锁清理失败: ${formatError(error)}`;
+
+      if (result) {
+        result.warnings.push(message);
+      } else if (!deployError && !cleanupError) {
+        cleanupError = error;
+      }
+    }
+
+    if (cleanupError && !deployError) {
+      throw cleanupError;
+    }
   }
 }
 
@@ -160,6 +196,23 @@ async function deployRelease(
     currentSymlink: currentSymlinkPath,
     usedFallback,
     warnings,
+  };
+}
+
+async function acquireRemoteDeployLock(
+  config: SshReleaseConfig,
+  client: RemoteClient,
+  lockPath: string,
+): Promise<() => Promise<void>> {
+  const createdAtPath = remoteJoin(lockPath, 'created_at');
+  const pidPath = remoteJoin(lockPath, 'pid');
+  const lockedMessage = `远程已有发布任务正在运行，请确认后删除 ${lockPath}`;
+  const command = `mkdir -p ${shellQuote(config.target.path)} && if mkdir ${shellQuote(lockPath)} 2>/dev/null; then printf '%s\\n' "$$" > ${shellQuote(pidPath)}; date -u '+%Y-%m-%dT%H:%M:%SZ' > ${shellQuote(createdAtPath)}; else echo ${shellQuote(lockedMessage)} >&2; exit 73; fi`;
+
+  await client.exec(command);
+
+  return async () => {
+    await client.exec(`rm -rf ${shellQuote(lockPath)}`);
   };
 }
 

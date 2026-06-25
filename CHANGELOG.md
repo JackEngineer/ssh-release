@@ -7,6 +7,7 @@
 - 增加 `--help` 和 `--version`，方便安装后确认 CLI 能力和版本。
 - 增加 `--config <path>`，支持使用非默认配置文件。
 - 增加 `ssh-release deploy --dry-run`，可在不连接远端、不修改服务器的情况下查看发布计划。
+- 增加远端发布锁 `.ssh-release.lock`，避免同一目标目录并发发布。
 - 增加 GitHub Actions CI，在 `main` 推送和 Pull Request 上运行安装、类型检查、测试和构建。
 
 ## 0.1.0 - 2026-06-25
