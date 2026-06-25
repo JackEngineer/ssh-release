@@ -4,8 +4,16 @@ import test from 'node:test';
 
 interface PackageJson {
   bin?: Record<string, string>;
+  bugs?: {
+    url?: string;
+  };
   engines?: Record<string, string>;
   files?: string[];
+  homepage?: string;
+  repository?: {
+    type?: string;
+    url?: string;
+  };
   scripts?: Record<string, string>;
 }
 
@@ -15,7 +23,7 @@ test('declares npm publish boundaries and verification hooks', async () => {
   ) as PackageJson;
 
   assert.deepEqual(packageJson.bin, {
-    'ssh-release': './dist/cli.js',
+    'ssh-release': 'dist/cli.js',
   });
   assert.deepEqual(packageJson.files, [
     'dist',
@@ -23,6 +31,14 @@ test('declares npm publish boundaries and verification hooks', async () => {
     'LICENSE',
   ]);
   assert.equal(packageJson.engines?.node, '>=20.0.0');
+  assert.deepEqual(packageJson.repository, {
+    type: 'git',
+    url: 'git+https://github.com/JackEngineer/ssh-release.git',
+  });
+  assert.deepEqual(packageJson.bugs, {
+    url: 'https://github.com/JackEngineer/ssh-release/issues',
+  });
+  assert.equal(packageJson.homepage, 'https://github.com/JackEngineer/ssh-release#readme');
   assert.equal(packageJson.scripts?.prepack, 'npm run build');
   assert.equal(packageJson.scripts?.prepublishOnly, 'npm run lint && npm test && npm run build');
 });

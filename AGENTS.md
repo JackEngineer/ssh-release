@@ -23,6 +23,8 @@
 - `npm run build`：编译发布产物。
 - `npm test`：运行完整测试。
 - `npm run lint`：检查格式和静态问题。
+- `npm run prepublishOnly`：发布前运行 lint、test 和 build。
+- `npm publish --dry-run`：检查 npm 发布包内容，不执行真实发布。
 
 新增常用命令后，同步更新本文档。
 

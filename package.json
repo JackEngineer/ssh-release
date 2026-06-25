@@ -4,7 +4,7 @@
   "description": "A general-purpose SSH file release CLI.",
   "type": "module",
   "bin": {
-    "ssh-release": "./dist/cli.js"
+    "ssh-release": "dist/cli.js"
   },
   "files": [
     "dist",
@@ -28,6 +28,14 @@
     "deploy",
     "cli"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JackEngineer/ssh-release.git"
+  },
+  "bugs": {
+    "url": "https://github.com/JackEngineer/ssh-release/issues"
+  },
+  "homepage": "https://github.com/JackEngineer/ssh-release#readme",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^20.19.1",

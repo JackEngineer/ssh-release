@@ -26,6 +26,20 @@
 npm install
 ```
 
+## 全局安装
+
+发布到 npm 后，可以在任意项目中全局安装：
+
+```bash
+npm install -g ssh-release
+```
+
+安装后在需要发布文件的项目目录中执行：
+
+```bash
+ssh-release init
+```
+
 ## 本地开发
 
 ```bash
@@ -226,6 +240,27 @@ npm run build
 - `npm test`：运行 Node.js 测试。
 - `npm run build`：编译 `dist/`。
 
+## 发布前检查
+
+发布前先运行完整校验：
+
+```bash
+npm run prepublishOnly
+npm publish --dry-run
+```
+
+需要验证 npm 安装后的真实命令入口时，可以使用本地 tarball 做烟测：
+
+```bash
+PACK_DIR=$(mktemp -d)
+npm pack --pack-destination "$PACK_DIR"
+npm install -g "$PACK_DIR"/ssh-release-0.1.0.tgz --prefix "$PACK_DIR/prefix"
+"$PACK_DIR/prefix/bin/ssh-release"
+"$PACK_DIR/prefix/bin/ssh-release" init
+```
+
+`npm publish` 会发布到 npm registry，只有确认版本号、包内容、登录账号和发布权限都正确后再执行。
+
 ## 项目结构
 
 ```text
@@ -248,7 +283,9 @@ tests/
 ├── config-load.test.ts
 ├── config-template.test.ts
 ├── deploy.test.ts
+├── e2e.test.ts
 ├── list-doctor.test.ts
+├── package-json.test.ts
 ├── package.test.ts
 ├── release.test.ts
 ├── rollback.test.ts
