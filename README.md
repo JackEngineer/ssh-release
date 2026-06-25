@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-当前仓库已完成第一版 MVP。
+当前版本已进入 1.0 稳定版，CLI 命令、JSON 输出、配置字段和安全边界见 [docs/contracts.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/contracts.md)。
 
 已实现：
 
@@ -407,6 +407,7 @@ tests/
 └── validate.test.ts
 
 docs/
+├── contracts.md
 ├── github-actions.md
 ├── recovery.md
 ├── release-checklist.md
