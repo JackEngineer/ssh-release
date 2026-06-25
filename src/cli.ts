@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-import { pathToFileURL } from 'node:url';
+import { realpathSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { CONFIG_FILE_NAME, loadConfigFile, writeConfigTemplate } from './config.js';
 import { runDoctorFromFile, type DoctorReport } from './doctor.js';
@@ -24,6 +26,14 @@ export interface CliHandlers {
 export interface RunCliOptions {
   io?: CliIo;
   handlers?: CliHandlers;
+}
+
+export function isCliEntrypoint(moduleUrl: string, argvEntry?: string): boolean {
+  if (!argvEntry) {
+    return false;
+  }
+
+  return toRealPath(fileURLToPath(moduleUrl)) === toRealPath(argvEntry);
 }
 
 export async function runCli(
@@ -142,7 +152,15 @@ function printDoctorReport(report: DoctorReport, io: CliIo): void {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+function toRealPath(filePath: string): string {
+  try {
+    return realpathSync(filePath);
+  } catch {
+    return resolve(filePath);
+  }
+}
+
+if (isCliEntrypoint(import.meta.url, process.argv[1])) {
   const exitCode = await runCli();
   process.exit(exitCode);
 }
