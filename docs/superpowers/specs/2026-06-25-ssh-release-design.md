@@ -1,7 +1,6 @@
 # ssh-release 设计文档
 
 日期：2026-06-25
-项目目录：`/Users/jacklee/work/personal/ssh-release`
 
 ## 1. 项目定位
 
