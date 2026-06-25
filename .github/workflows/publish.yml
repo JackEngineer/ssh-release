@@ -46,3 +46,27 @@ jobs:
 
       - name: Publish to npm
         run: npm publish
+
+      - name: Verify published package
+        run: |
+          PACKAGE_VERSION="$(node -p "JSON.parse(require('fs').readFileSync('package.json', 'utf8')).version")"
+          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            PUBLISHED_VERSION="$(npm view "ssh-release@$PACKAGE_VERSION" version 2>/dev/null || true)"
+            LATEST_VERSION="$(npm view ssh-release dist-tags.latest 2>/dev/null || true)"
+            if [ "$PUBLISHED_VERSION" = "$PACKAGE_VERSION" ] && [ "$LATEST_VERSION" = "$PACKAGE_VERSION" ]; then
+              exit 0
+            fi
+            echo "Waiting for npm registry, attempt $attempt..."
+            sleep 10
+          done
+          echo "ssh-release@$PACKAGE_VERSION was not visible as npm latest after publish" >&2
+          exit 1
+
+      - name: Smoke test published package
+        run: |
+          PACKAGE_VERSION="$(node -p "JSON.parse(require('fs').readFileSync('package.json', 'utf8')).version")"
+          PACK_DIR="$(mktemp -d)"
+          npm install -g "ssh-release@$PACKAGE_VERSION" --prefix "$PACK_DIR/prefix"
+          PATH="$PACK_DIR/prefix/bin:$PATH"
+          ssh-release --version --json
+          ssh-release --help

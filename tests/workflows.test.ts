@@ -29,6 +29,11 @@ test('publishes npm packages through trusted publishing without long-lived token
   assert.match(workflow, /npm run prepublishOnly/);
   assert.match(workflow, /npm publish --dry-run/);
   assert.match(workflow, /npm publish/);
+  assert.match(workflow, /Verify published package/);
+  assert.match(workflow, /npm view "ssh-release@\$PACKAGE_VERSION" version/);
+  assert.match(workflow, /Smoke test published package/);
+  assert.match(workflow, /npm install -g "ssh-release@\$PACKAGE_VERSION"/);
+  assert.match(workflow, /ssh-release --version --json/);
   assert.doesNotMatch(workflow, /NODE_AUTH_TOKEN|NPM_TOKEN|secrets\./);
   assert.match(ciWorkflow, /TZ: Asia\/Shanghai/);
 
@@ -36,5 +41,7 @@ test('publishes npm packages through trusted publishing without long-lived token
   assert.match(checklist, /workflow 文件为 `publish\.yml`/);
   assert.match(checklist, /OIDC/);
   assert.match(checklist, /不需要 `NPM_TOKEN`/);
+  assert.match(checklist, /发布后 registry 验证/);
+  assert.match(checklist, /安装烟测/);
   assert.match(readme, /\.github\/workflows\/publish\.yml/);
 });

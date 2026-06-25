@@ -109,6 +109,8 @@ git push origin "v$VERSION"
 - `actions/setup-node` 配置 `registry-url: https://registry.npmjs.org`。
 - 发布 job 使用 GitHub 托管 runner，不使用 self-hosted runner。
 - 发布命令为 `npm publish`，不设置 `NODE_AUTH_TOKEN`、`NPM_TOKEN` 或其他长期发布 token。
+- 发布完成后必须执行发布后 registry 验证，确认 `ssh-release@<version>` 可查询且 `latest` 指向当前版本。
+- 发布完成后必须执行安装烟测，从 npm 安装当前版本并运行 `ssh-release --version --json` 和 `ssh-release --help`。
 
 发布完成后验证：
 

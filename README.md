@@ -339,6 +339,7 @@ npm run build
 - `npm run build`：编译 `dist/`。
 - GitHub Actions 会在 `main` 推送和 Pull Request 上运行 `npm ci`、`lint`、`test` 和 `build`。
 - 推送 `v*` 标签会触发 npm 自动发布 workflow。发布使用 npm Trusted Publishing，不需要长期 `NPM_TOKEN`。
+- 发布 workflow 会在 `npm publish` 后验证 npm registry 的当前版本和 `latest`，并从 npm 重新安装当前版本做 CLI 烟测。
 
 ## 发布前检查
 

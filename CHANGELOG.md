@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- 增强 npm 自动发布 workflow，发布后会验证 registry 版本和安装后的 CLI 入口。
+
 ## 1.0.1 - 2026-06-25
 
 ### Added
