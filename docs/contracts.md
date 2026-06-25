@@ -79,6 +79,7 @@
 - `mode`
 - `targetPath`
 - `usedFallback`
+- `manifest`
 - `warnings`
 - `verified`
 - `verification`
@@ -131,14 +132,23 @@ server: {
 
 - 版本目录存在。
 - `current` 已指向新版本。
+- `manifest.json` 已上传且远端 hash 与本地生成的清单 hash 一致。
 - 远端锁已清理。
 
 `overwrite` 模式校验：
 
 - 目标目录存在。
+- `manifest.json` 已上传且远端 hash 与本地生成的清单 hash 一致。
 - 远端锁已清理。
 
 校验失败时命令返回失败，不会输出成功结果。
+
+`deploy` 会在目标目录写入 `manifest.json`：
+
+- `release` 模式写入版本目录。
+- `overwrite` 模式写入目标目录。
+
+清单记录本次发布版本、创建时间、配置中的本地来源路径、排除规则、文件相对路径、文件大小、文件 SHA-256、文件总数和总字节数。
 
 ## 安全边界
 

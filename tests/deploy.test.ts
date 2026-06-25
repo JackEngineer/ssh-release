@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { access, mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { access, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -10,7 +11,7 @@ import type { SshReleaseConfig } from '../src/types.js';
 
 class FakeRemoteClient implements RemoteClient {
   commands: string[] = [];
-  uploadedFiles: Array<{ localPath: string; remotePath: string }> = [];
+  uploadedFiles: Array<{ localPath: string; remotePath: string; content?: string }> = [];
   uploadedDirectories: Array<{ localPath: string; remotePath: string; exclude: string[] }> = [];
   releases = ['20260625-120000', '20260625-121000', '20260625-122000'];
   currentVersion = '20260625-122000';
@@ -50,6 +51,25 @@ class FakeRemoteClient implements RemoteClient {
       return { stdout: '', stderr: '' };
     }
 
+    if (command.includes("test -f '/var/www/site/") && command.includes('manifest.json')) {
+      return { stdout: '', stderr: '' };
+    }
+
+    if (command.includes('manifest.json') && (command.includes('sha256sum') || command.includes('shasum'))) {
+      const manifestPath = command.match(/'([^']*manifest\.json)'/)?.[1];
+      const uploadedManifest = this.uploadedFiles.find((file) => file.remotePath === manifestPath);
+
+      if (!uploadedManifest) {
+        throw new Error('manifest missing');
+      }
+
+      const manifestBuffer = Buffer.from(uploadedManifest.content ?? '');
+      return {
+        stdout: `${createHash('sha256').update(manifestBuffer).digest('hex')}\n`,
+        stderr: '',
+      };
+    }
+
     if (command.includes('for release_path in')) {
       return { stdout: `${this.releases.join('\n')}\n`, stderr: '' };
     }
@@ -62,6 +82,15 @@ class FakeRemoteClient implements RemoteClient {
   }
 
   async uploadFile(localPath: string, remotePath: string): Promise<void> {
+    if (remotePath.endsWith('/manifest.json')) {
+      this.uploadedFiles.push({
+        localPath,
+        remotePath,
+        content: await readFile(localPath, 'utf8'),
+      });
+      return;
+    }
+
     this.uploadedFiles.push({ localPath, remotePath });
   }
 
@@ -85,7 +114,13 @@ test('deploys release mode with package upload, tar extraction, symlink switch, 
   assert.equal(result.mode, 'release');
   assert.equal(result.version, '20260625-153000');
   assert.equal(result.usedFallback, false);
-  assert.deepEqual(client.uploadedFiles, [
+  assert.deepEqual(client.uploadedFiles.map((file) => file.remotePath), [
+    '/var/www/site/.ssh-release-tmp/20260625-153000.tgz',
+    '/var/www/site/releases/20260625-153000/manifest.json',
+  ]);
+  assert.equal(client.uploadedFiles[0].localPath, path.join(sourcePath, 'release.tgz'));
+  assert.match(client.uploadedFiles[1].localPath, /manifest\.json$/);
+  assert.deepEqual(client.uploadedFiles.slice(0, 1), [
     {
       localPath: path.join(sourcePath, 'release.tgz'),
       remotePath: '/var/www/site/.ssh-release-tmp/20260625-153000.tgz',
@@ -95,6 +130,45 @@ test('deploys release mode with package upload, tar extraction, symlink switch, 
   assert.ok(client.commands.some((command) => command.includes("tar -xzf '/var/www/site/.ssh-release-tmp/20260625-153000.tgz' -C '/var/www/site/releases/20260625-153000'")));
   assert.ok(client.commands.some((command) => command.includes("ln -sfn 'releases/20260625-153000' '/var/www/site/current'")));
   assert.ok(client.commands.some((command) => command.includes("rm -rf '/var/www/site/releases/20260625-120000'")));
+});
+
+test('uploads a release manifest and verifies it after deploy', async () => {
+  const { config, sourcePath } = await createConfig();
+  const client = new FakeRemoteClient();
+
+  const result = await deploy(config, client, {
+    now: new Date('2026-06-25T15:30:00+08:00'),
+    createPackage: async () => ({
+      archivePath: path.join(sourcePath, 'release.tgz'),
+      cleanup: async () => {},
+    }),
+  });
+
+  assert.equal(result.manifest?.remotePath, '/var/www/site/releases/20260625-153000/manifest.json');
+  assert.equal(result.manifest?.fileCount, 1);
+  assert.equal(result.manifest?.totalBytes, Buffer.byteLength('<h1>ok</h1>'));
+  assert.match(result.manifest?.sha256 ?? '', /^[a-f0-9]{64}$/);
+
+  const manifestUpload = client.uploadedFiles.find((file) => file.remotePath === result.manifest?.remotePath);
+  assert.ok(manifestUpload);
+
+  const manifest = JSON.parse(manifestUpload.content ?? '') as {
+    version: string;
+    createdAt: string;
+    files: Array<{ path: string; size: number; sha256: string }>;
+  };
+
+  assert.equal(manifest.version, '20260625-153000');
+  assert.equal(manifest.createdAt, '2026-06-25T07:30:00.000Z');
+  assert.deepEqual(manifest.files, [
+    {
+      path: 'index.html',
+      size: Buffer.byteLength('<h1>ok</h1>'),
+      sha256: createHash('sha256').update('<h1>ok</h1>').digest('hex'),
+    },
+  ]);
+  assert.ok(result.verification?.some((check) => check.name === '发布清单'));
+  assert.ok(client.commands.some((command) => command.includes("test -f '/var/www/site/releases/20260625-153000/manifest.json'")));
 });
 
 test('verifies release target, current symlink, and lock cleanup after deploy', async () => {
@@ -120,6 +194,11 @@ test('verifies release target, current symlink, and lock cleanup after deploy', 
       name: '当前版本',
       status: 'pass',
       message: 'current 已指向新版本',
+    },
+    {
+      name: '发布清单',
+      status: 'pass',
+      message: 'manifest.json 已上传并校验，文件数 1',
     },
     {
       name: '远端锁',
@@ -242,6 +321,11 @@ test('verifies overwrite target and lock cleanup after deploy', async () => {
       name: '目标目录',
       status: 'pass',
       message: '远端目标目录存在',
+    },
+    {
+      name: '发布清单',
+      status: 'pass',
+      message: 'manifest.json 已上传并校验，文件数 1',
     },
     {
       name: '远端锁',

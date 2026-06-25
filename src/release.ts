@@ -5,6 +5,12 @@ import {
   type CreateReleasePackageOptions,
   type ReleasePackage,
 } from './package.js';
+import {
+  createReleaseManifest,
+  writeReleaseManifest,
+  type ReleaseManifest,
+  type WrittenReleaseManifest,
+} from './manifest.js';
 import { acquireRemoteLock, readRemoteLockStatus } from './lock.js';
 import {
   readRemoteReleaseNames,
@@ -20,9 +26,17 @@ export interface DeployResult {
   targetPath: string;
   currentSymlink?: string;
   usedFallback: boolean;
+  manifest?: DeployManifestSummary;
   verified?: boolean;
   verification?: DeployVerificationCheck[];
   warnings: string[];
+}
+
+export interface DeployManifestSummary {
+  remotePath: string;
+  fileCount: number;
+  totalBytes: number;
+  sha256: string;
 }
 
 export interface DeployPlan {
@@ -98,26 +112,49 @@ export async function deploy(
 ): Promise<DeployResult> {
   await withDeployProgress(options, 'source', () => ensureSourceExists(config.source.path));
 
-  const versionName = createVersionName(options.now ?? new Date());
+  const releaseDate = options.now ?? new Date();
+  const versionName = createVersionName(releaseDate);
   const packageFactory = options.createPackage ?? createReleasePackage;
   const releaseLock = await withDeployProgress(options, 'lock', () => acquireRemoteLock(config, client));
   let releasePackage: ReleasePackage | undefined;
+  let manifest: ReleaseManifest | undefined;
+  let manifestFile: WrittenReleaseManifest | undefined;
   let result: DeployResult | undefined;
   let deployError: unknown;
   let cleanupError: unknown;
 
   try {
-    releasePackage = await withDeployProgress(options, 'package', () => packageFactory({
-      sourcePath: config.source.path,
-      exclude: config.source.exclude,
-      versionName,
-    }));
+    releasePackage = await withDeployProgress(options, 'package', async () => {
+      const createdPackage = await packageFactory({
+        sourcePath: config.source.path,
+        exclude: config.source.exclude,
+        versionName,
+      });
+
+      try {
+        manifest = await createReleaseManifest({
+          version: versionName,
+          createdAt: releaseDate,
+          sourcePath: config.source.path,
+          exclude: config.source.exclude,
+        });
+        manifestFile = await writeReleaseManifest(manifest);
+        return createdPackage;
+      } catch (error) {
+        await createdPackage.cleanup();
+        throw error;
+      }
+    });
+
+    if (!manifest || !manifestFile) {
+      throw new Error('发布清单生成失败');
+    }
 
     if (config.deploy.mode === 'overwrite') {
       result = await withDeployProgress(
         options,
         'publish',
-        () => deployOverwrite(config, client, releasePackage as ReleasePackage, versionName),
+        () => deployOverwrite(config, client, releasePackage as ReleasePackage, manifest as ReleaseManifest, manifestFile as WrittenReleaseManifest, versionName),
       );
       return result;
     }
@@ -125,7 +162,7 @@ export async function deploy(
     result = await withDeployProgress(
       options,
       'publish',
-      () => deployRelease(config, client, releasePackage as ReleasePackage, versionName),
+      () => deployRelease(config, client, releasePackage as ReleasePackage, manifest as ReleaseManifest, manifestFile as WrittenReleaseManifest, versionName),
     );
     return result;
   } catch (error) {
@@ -136,6 +173,14 @@ export async function deploy(
       if (releasePackage) {
         try {
           await releasePackage.cleanup();
+        } catch (error) {
+          cleanupError = error;
+        }
+      }
+
+      if (manifestFile) {
+        try {
+          await manifestFile.cleanup();
         } catch (error) {
           cleanupError = error;
         }
@@ -197,6 +242,8 @@ async function deployRelease(
   config: SshReleaseConfig,
   client: RemoteClient,
   releasePackage: ReleasePackage,
+  manifest: ReleaseManifest,
+  manifestFile: WrittenReleaseManifest,
   versionName: string,
 ): Promise<DeployResult> {
   const warnings: string[] = [];
@@ -204,6 +251,7 @@ async function deployRelease(
   const releasePath = remoteJoin(releasesPath, versionName);
   const tempPath = remoteJoin(config.target.path, config.target.tempDir);
   const remoteArchivePath = remoteJoin(tempPath, `${versionName}.tgz`);
+  const remoteManifestPath = remoteJoin(releasePath, 'manifest.json');
   const currentSymlinkPath = remoteJoin(config.target.path, config.target.currentSymlink);
 
   await client.exec(`mkdir -p ${shellQuote(releasesPath)} ${shellQuote(tempPath)} ${shellQuote(releasePath)}`);
@@ -217,6 +265,7 @@ async function deployRelease(
     true,
   );
 
+  await client.uploadFile(manifestFile.localPath, remoteManifestPath);
   await client.exec(`ln -sfn ${shellQuote(remoteJoin(config.target.releasesDir, versionName))} ${shellQuote(currentSymlinkPath)}`);
   await cleanupRemoteArchive(client, remoteArchivePath, warnings);
   await cleanupOldReleases(config, client, releasesPath, versionName, warnings);
@@ -227,6 +276,7 @@ async function deployRelease(
     targetPath: releasePath,
     currentSymlink: currentSymlinkPath,
     usedFallback,
+    manifest: createDeployManifestSummary(manifest, manifestFile, remoteManifestPath),
     warnings,
   };
 }
@@ -235,11 +285,14 @@ async function deployOverwrite(
   config: SshReleaseConfig,
   client: RemoteClient,
   releasePackage: ReleasePackage,
+  manifest: ReleaseManifest,
+  manifestFile: WrittenReleaseManifest,
   versionName: string,
 ): Promise<DeployResult> {
   const warnings: string[] = [];
   const tempPath = remoteJoin(config.target.path, config.target.tempDir);
   const remoteArchivePath = remoteJoin(tempPath, `${versionName}.tgz`);
+  const remoteManifestPath = remoteJoin(config.target.path, 'manifest.json');
 
   await client.exec(`mkdir -p ${shellQuote(config.target.path)} ${shellQuote(tempPath)}`);
   await client.uploadFile(releasePackage.archivePath, remoteArchivePath);
@@ -252,13 +305,28 @@ async function deployOverwrite(
     false,
   );
 
+  await client.uploadFile(manifestFile.localPath, remoteManifestPath);
   await cleanupRemoteArchive(client, remoteArchivePath, warnings);
 
   return {
     mode: 'overwrite',
     targetPath: config.target.path,
     usedFallback,
+    manifest: createDeployManifestSummary(manifest, manifestFile, remoteManifestPath),
     warnings,
+  };
+}
+
+function createDeployManifestSummary(
+  manifest: ReleaseManifest,
+  manifestFile: WrittenReleaseManifest,
+  remotePath: string,
+): DeployManifestSummary {
+  return {
+    remotePath,
+    fileCount: manifest.totals.files,
+    totalBytes: manifest.totals.bytes,
+    sha256: manifestFile.sha256,
   };
 }
 
@@ -336,6 +404,7 @@ async function verifyDeployResult(
   if (result.mode === 'overwrite') {
     return [
       await verifyRemoteDirectory(client, result.targetPath, '目标目录', '远端目标目录存在'),
+      ...await verifyOptionalManifest(client, result),
       await verifyRemoteLockReleased(config, client),
     ];
   }
@@ -347,8 +416,58 @@ async function verifyDeployResult(
   return [
     await verifyRemoteDirectory(client, result.targetPath, '版本目录', '远端版本目录存在'),
     await verifyCurrentSymlink(client, result.currentSymlink, remoteJoin(config.target.releasesDir, result.version)),
+    ...await verifyOptionalManifest(client, result),
     await verifyRemoteLockReleased(config, client),
   ];
+}
+
+async function verifyOptionalManifest(
+  client: RemoteClient,
+  result: DeployResult,
+): Promise<DeployVerificationCheck[]> {
+  if (!result.manifest) {
+    return [];
+  }
+
+  return [await verifyRemoteManifest(client, result.manifest)];
+}
+
+async function verifyRemoteManifest(
+  client: RemoteClient,
+  manifest: DeployManifestSummary,
+): Promise<DeployVerificationCheck> {
+  try {
+    await client.exec(`test -f ${shellQuote(manifest.remotePath)}`);
+  } catch (error) {
+    throw new Error(`manifest 校验失败: ${formatError(error)}`);
+  }
+
+  const actualHash = await readRemoteFileSha256(client, manifest.remotePath);
+
+  if (actualHash !== manifest.sha256) {
+    throw new Error(`manifest hash 不匹配: 期望 ${manifest.sha256}，实际 ${actualHash || '空'}`);
+  }
+
+  return {
+    name: '发布清单',
+    status: 'pass',
+    message: `manifest.json 已上传并校验，文件数 ${manifest.fileCount}`,
+  };
+}
+
+async function readRemoteFileSha256(
+  client: RemoteClient,
+  remotePath: string,
+): Promise<string> {
+  const quotedPath = shellQuote(remotePath);
+  const result = await client.exec(`if command -v sha256sum >/dev/null 2>&1; then sha256sum ${quotedPath} | awk '{print $1}'; elif command -v shasum >/dev/null 2>&1; then shasum -a 256 ${quotedPath} | awk '{print $1}'; else echo ''; fi`);
+  const hash = result.stdout.trim();
+
+  if (!hash) {
+    throw new Error('远端缺少 sha256sum 或 shasum，无法校验 manifest hash');
+  }
+
+  return hash;
 }
 
 async function verifyRemoteDirectory(

@@ -18,7 +18,8 @@
 - `ssh-release unlock`：查看远端锁，并在显式确认锁路径后删除锁。
 - `--json`：输出单行 JSON，便于 CI/CD 解析。
 - `deploy --json --progress`：发布时输出 NDJSON 阶段进度，便于 CI/CD 展示实时状态。
-- 发布后远端校验：确认版本目录或目标目录存在、`current` 已指向新版本、远端锁已清理。
+- 发布 manifest：每次发布生成 `manifest.json`，记录版本、发布时间、本地来源、文件清单、文件大小和 SHA-256。
+- 发布后远端校验：确认版本目录或目标目录存在、`current` 已指向新版本、`manifest.json` hash 匹配、远端锁已清理。
 - `release` 模式：上传压缩包、远端解压、切换 `current`、清理旧版本。
 - `overwrite` 模式：直接覆盖发布到目标目录。
 - 远端 `tar` 解压失败时回退逐文件上传。
@@ -187,9 +188,22 @@ ssh-release deploy --dry-run
 ssh-release deploy
 ```
 
-`release` 模式发布成功后会输出版本号、版本目录和 `current` 软链接路径。只有压缩包上传和解压完成后才切换 `current`。
+`release` 模式发布成功后会输出版本号、版本目录、`current` 软链接路径和远端 `manifest.json` 路径。只有压缩包上传、解压和发布清单上传完成后才切换 `current`。
 
-发布命令返回成功前会执行远端状态校验。`release` 模式会确认新版本目录存在、`current` 已指向新版本、远端锁已清理；`overwrite` 模式会确认目标目录存在、远端锁已清理。校验失败时发布命令返回失败，不会把结果标记为成功。
+发布命令返回成功前会执行远端状态校验。`release` 模式会确认新版本目录存在、`current` 已指向新版本、发布清单 hash 匹配、远端锁已清理；`overwrite` 模式会确认目标目录存在、发布清单 hash 匹配、远端锁已清理。校验失败时发布命令返回失败，不会把结果标记为成功。
+
+`manifest.json` 会写入发布目标目录：
+
+- `release` 模式：`<target.path>/<releasesDir>/<version>/manifest.json`
+- `overwrite` 模式：`<target.path>/manifest.json`
+
+清单内容包含：
+
+- `version`：本次发布版本号。
+- `createdAt`：发布时间。
+- `source`：配置中的本地来源路径、来源类型和排除规则。
+- `files`：每个文件的相对路径、字节数和 SHA-256。
+- `totals`：文件数量和总字节数。
 
 如果远端已有 `.ssh-release.lock`，说明同一目标目录可能正在发布或回滚，工具会停止在修改远端状态之前。
 
@@ -245,7 +259,7 @@ ssh-release unlock --json
 成功时输出单行 JSON：
 
 ```json
-{"ok":true,"command":"deploy","result":{"mode":"release","version":"20260625-153000","verified":true}}
+{"ok":true,"command":"deploy","result":{"mode":"release","version":"20260625-153000","manifest":{"remotePath":"/var/www/my-app/releases/20260625-153000/manifest.json","fileCount":12,"totalBytes":34567,"sha256":"..."},"verified":true}}
 ```
 
 命令执行失败时输出：
@@ -273,7 +287,7 @@ ssh-release deploy --json --progress
 发布结果中的 `verification` 会列出已通过的远端校验项：
 
 ```json
-{"verified":true,"verification":[{"name":"当前版本","status":"pass","message":"current 已指向新版本"}]}
+{"verified":true,"verification":[{"name":"发布清单","status":"pass","message":"manifest.json 已上传并校验，文件数 12"}]}
 ```
 
 `doctor` 检查失败、`unlock` 发现锁但未删除时会返回非零退出码，并在 JSON 的 `result` 中保留检查结果。
@@ -318,6 +332,7 @@ export SSH_RELEASE_PASSWORD='your-password'
 - `tar`：本地打包发布内容。
 - `ssh`：执行远端目录、解压、软链接、列表和检查命令。
 - `scp`：上传压缩包和逐文件回退上传。
+- `sha256sum` 或 `shasum`：发布后校验远端 `manifest.json` hash。
 - `sshpass`：仅密码登录时需要；私钥登录不需要。
 
 在 macOS 上打包时会禁用 AppleDouble 和扩展属性元数据，避免把 `._*` 文件发布到 Linux 服务器。
@@ -386,6 +401,7 @@ src/
 ├── doctor.ts
 ├── lock.ts
 ├── list.ts
+├── manifest.ts
 ├── package.ts
 ├── process.ts
 ├── remote.ts
@@ -403,6 +419,7 @@ tests/
 ├── deploy.test.ts
 ├── e2e.test.ts
 ├── list-doctor.test.ts
+├── manifest.test.ts
 ├── package-json.test.ts
 ├── package.test.ts
 ├── release.test.ts
@@ -434,6 +451,7 @@ docs/
 - macOS AppleDouble 元数据排除。
 - `release` 和 `overwrite` 发布流程。
 - 发布和回滚锁获取、释放和锁冲突拦截。
+- 发布 manifest 生成、上传和远端 hash 校验。
 - `doctor` 远端锁状态检查和安全清理提示。
 - `unlock` 显式确认路径后删除远端锁。
 - 远端 `tar` 失败后的逐文件上传回退。

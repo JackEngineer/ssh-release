@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- 增加发布 manifest，发布时生成并上传 `manifest.json`，记录文件清单、大小和 SHA-256。
+- 增强发布后校验，远端 `manifest.json` 会进行 hash 校验。
+
 ## 1.0.2 - 2026-06-26
 
 ### Changed

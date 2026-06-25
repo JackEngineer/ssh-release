@@ -47,6 +47,8 @@ test('documents stable CLI, JSON, config, and safety contracts for 1.0', async (
   assert.match(guide, /ssh-release deploy --json --progress/);
   assert.match(guide, /"ok": true/);
   assert.match(guide, /"verified": true/);
+  assert.match(guide, /manifest\.json/);
+  assert.match(guide, /SHA-256/);
   assert.match(guide, /退出码/);
   assert.match(guide, /SSH_RELEASE_HOST/);
   assert.match(guide, /不会执行自定义远程 hook/);
@@ -58,5 +60,7 @@ test('documents stable CLI, JSON, config, and safety contracts for 1.0', async (
     'npm_[A-Za-z0-9]{20,}',
   ].join('|')));
   assert.match(readme, /当前版本已进入 1\.0 稳定版/);
+  assert.match(readme, /发布 manifest/);
+  assert.match(readme, /manifest\.json/);
   assert.match(readme, /docs\/contracts\.md/);
 });

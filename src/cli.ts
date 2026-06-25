@@ -381,6 +381,11 @@ function printDeployResult(result: DeployResult | DeployPlan, io: CliIo): void {
     io.log('远端 tar 不可用或解压失败，已使用逐文件上传');
   }
 
+  if (result.manifest) {
+    io.log(`发布清单: ${result.manifest.remotePath}`);
+    io.log(`清单文件数: ${result.manifest.fileCount}`);
+  }
+
   if (result.verified) {
     io.log('远端校验通过');
 

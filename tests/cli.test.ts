@@ -405,6 +405,36 @@ test('prints remote verification status after deploy succeeds', async () => {
   assert.equal(stdout.includes('校验: 当前版本 - current 已指向新版本'), true);
 });
 
+test('prints manifest path after deploy succeeds', async () => {
+  const stdout: string[] = [];
+
+  assert.equal(await runCli(['deploy'], {
+    io: {
+      log: (message: string) => stdout.push(message),
+      error: () => undefined,
+    },
+    handlers: {
+      ...createFailingHandlers(),
+      deploy: async () => ({
+        mode: 'release' as const,
+        version: '20260625-180000',
+        targetPath: '/var/www/site/releases/20260625-180000',
+        currentSymlink: '/var/www/site/current',
+        usedFallback: false,
+        manifest: {
+          remotePath: '/var/www/site/releases/20260625-180000/manifest.json',
+          fileCount: 2,
+          totalBytes: 120,
+          sha256: 'a'.repeat(64),
+        },
+        warnings: [],
+      }),
+    },
+  }), 0);
+
+  assert.equal(stdout.includes('发布清单: /var/www/site/releases/20260625-180000/manifest.json'), true);
+});
+
 function createFailingHandlers() {
   return {
     init: async () => {
