@@ -84,6 +84,14 @@ test('dispatches deploy, rollback, list, and doctor commands', async () => {
           checks: [],
         };
       },
+      unlock: async () => {
+        calls.push('unlock');
+        return {
+          locked: false,
+          removed: false,
+          lockPath: '/var/www/site/.ssh-release.lock',
+        };
+      },
     },
   };
 
@@ -100,6 +108,58 @@ test('dispatches deploy, rollback, list, and doctor commands', async () => {
   ]);
   assert.equal(stderr.length, 0);
   assert.equal(stdout.some((line) => line.includes('命令尚未实现')), false);
+});
+
+test('dispatches unlock with an explicit confirm path and prints safe guidance', async () => {
+  const stdout: string[] = [];
+  const receivedOptions: unknown[] = [];
+  const base = {
+    io: {
+      log: (message: string) => stdout.push(message),
+      error: () => undefined,
+    },
+    handlers: {
+      ...createFailingHandlers(),
+      unlock: async (options?: unknown) => {
+        receivedOptions.push(options);
+        return {
+          locked: true,
+          removed: false,
+          lockPath: '/var/www/site/.ssh-release.lock',
+          pid: '12345',
+          createdAt: '2026-06-25T13:30:00Z',
+        };
+      },
+    },
+  } as Parameters<typeof runCli>[1];
+
+  assert.equal(await runCli(['unlock'], base), 1);
+  assert.equal(stdout.includes('发现远端锁: /var/www/site/.ssh-release.lock'), true);
+  assert.equal(stdout.includes('不会自动删除远端锁'), true);
+  assert.equal(stdout.includes('确认没有发布或回滚任务后再执行:'), true);
+  assert.equal(stdout.includes('ssh-release unlock --confirm /var/www/site/.ssh-release.lock'), true);
+
+  stdout.length = 0;
+  assert.equal(await runCli(['unlock', '--confirm', '/var/www/site/.ssh-release.lock'], {
+    ...base,
+    handlers: {
+      ...createFailingHandlers(),
+      unlock: async (options?: unknown) => {
+        receivedOptions.push(options);
+        return {
+          locked: true,
+          removed: true,
+          lockPath: '/var/www/site/.ssh-release.lock',
+        };
+      },
+    },
+  } as Parameters<typeof runCli>[1]), 0);
+
+  assert.deepEqual(receivedOptions, [
+    { confirmPath: undefined },
+    { confirmPath: '/var/www/site/.ssh-release.lock' },
+  ]);
+  assert.equal(stdout.includes('已删除远端锁: /var/www/site/.ssh-release.lock'), true);
 });
 
 test('recognizes npm bin symlink as cli entrypoint', async (t) => {
@@ -187,6 +247,9 @@ function createFailingHandlers() {
     },
     doctor: async () => {
       throw new Error('unexpected doctor');
+    },
+    unlock: async () => {
+      throw new Error('unexpected unlock');
     },
   };
 }

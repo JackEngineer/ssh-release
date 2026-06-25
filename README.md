@@ -15,6 +15,7 @@
 - `ssh-release deploy`：发布本地文件或目录。
 - `ssh-release list`：查看远程版本和当前版本。
 - `ssh-release rollback [version]`：回滚到上一个版本或指定版本。
+- `ssh-release unlock`：查看远端锁，并在显式确认锁路径后删除锁。
 - `release` 模式：上传压缩包、远端解压、切换 `current`、清理旧版本。
 - `overwrite` 模式：直接覆盖发布到目标目录。
 - 远端 `tar` 解压失败时回退逐文件上传。
@@ -55,6 +56,7 @@ npm run dev -- doctor
 npm run dev -- deploy
 npm run dev -- list
 npm run dev -- rollback
+npm run dev -- unlock
 ```
 
 构建 CLI：
@@ -184,7 +186,21 @@ ssh-release deploy
 
 `release` 模式发布成功后会输出版本号、版本目录和 `current` 软链接路径。只有压缩包上传和解压完成后才切换 `current`。
 
-如果远端已有 `.ssh-release.lock`，说明同一目标目录可能正在发布或回滚，工具会停止在修改远端状态之前。确认没有任务运行后，可以手动删除 `target.path/.ssh-release.lock` 再重试。
+如果远端已有 `.ssh-release.lock`，说明同一目标目录可能正在发布或回滚，工具会停止在修改远端状态之前。
+
+查看锁状态：
+
+```bash
+ssh-release unlock
+```
+
+确认没有发布或回滚任务运行后，可以显式确认锁路径并删除锁：
+
+```bash
+ssh-release unlock --confirm /var/www/my-app/.ssh-release.lock
+```
+
+`--confirm` 后的路径必须和当前配置计算出的锁路径完全一致，否则不会删除锁。
 
 远端 `tar` 不可用或解压失败时，如果 `deploy.fallbackToFileUpload` 为 `true`，工具会回退逐文件上传。`release` 模式只清理失败的新版本目录；`overwrite` 模式不会先删除整个目标目录。
 
@@ -314,6 +330,7 @@ src/
 ├── rollback.ts
 ├── ssh.ts
 ├── types.ts
+├── unlock.ts
 └── validate.ts
 
 tests/
@@ -328,6 +345,7 @@ tests/
 ├── release.test.ts
 ├── rollback.test.ts
 ├── ssh.test.ts
+├── unlock.test.ts
 └── validate.test.ts
 
 docs/
@@ -350,6 +368,7 @@ docs/
 - `release` 和 `overwrite` 发布流程。
 - 发布和回滚锁获取、释放和锁冲突拦截。
 - `doctor` 远端锁状态检查和安全清理提示。
+- `unlock` 显式确认路径后删除远端锁。
 - 远端 `tar` 失败后的逐文件上传回退。
 - 远程版本列表读取和当前版本标记。
 - `doctor` 检查结果。

@@ -67,6 +67,13 @@ export async function acquireRemoteLock(
   };
 }
 
+export async function removeRemoteLock(
+  config: SshReleaseConfig,
+  client: RemoteClient,
+): Promise<void> {
+  await client.exec(`rm -rf ${shellQuote(getRemoteLockPath(config))}`);
+}
+
 function parseRemoteLockValue(lines: string[], fieldName: string): string | undefined {
   const prefix = `${fieldName}=`;
   const line = lines.find((entry) => entry.startsWith(prefix));

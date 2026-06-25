@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0 - 2026-06-25
+
+### Added
+
+- 增加 `ssh-release unlock` 安全解锁流程，默认只查看远端锁，必须传入匹配的 `--confirm <lock-path>` 才会删除锁目录。
+
 ## 0.3.0 - 2026-06-25
 
 ### Added

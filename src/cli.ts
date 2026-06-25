@@ -9,6 +9,7 @@ import { listReleases, type ListReleasesResult } from './list.js';
 import { createDeployPlan, deploy, type DeployPlan, type DeployResult } from './release.js';
 import { rollback, type RollbackResult } from './rollback.js';
 import { createRemoteClient } from './ssh.js';
+import { unlock, type UnlockResult } from './unlock.js';
 
 export interface CliIo {
   log: (message: string) => void;
@@ -19,12 +20,17 @@ export interface DeployCliOptions {
   dryRun?: boolean;
 }
 
+export interface UnlockCliOptions {
+  confirmPath?: string;
+}
+
 export interface CliHandlers {
   init: () => Promise<void>;
   deploy: (options?: DeployCliOptions) => Promise<DeployResult | DeployPlan>;
   rollback: (version?: string) => Promise<RollbackResult>;
   list: () => Promise<ListReleasesResult>;
   doctor: () => Promise<DoctorReport>;
+  unlock: (options?: UnlockCliOptions) => Promise<UnlockResult>;
 }
 
 export interface RunCliOptions {
@@ -94,6 +100,12 @@ export async function runCli(
       return report.ok ? 0 : 1;
     }
 
+    if (command === 'unlock') {
+      const result = await handlers.unlock({ confirmPath: parsed.confirmPath });
+      printUnlockResult(result, io);
+      return result.locked && !result.removed ? 1 : 0;
+    }
+
     printUsage(io);
     return command ? 1 : 0;
   } catch (error) {
@@ -105,6 +117,7 @@ export async function runCli(
 interface ParsedCliArgs {
   args: string[];
   command?: string;
+  confirmPath?: string;
   configPath: string;
   dryRun: boolean;
   error?: string;
@@ -114,6 +127,7 @@ interface ParsedCliArgs {
 
 function parseCliArgs(argv: string[]): ParsedCliArgs {
   const args: string[] = [];
+  let confirmPath: string | undefined;
   let configPath = CONFIG_FILE_NAME;
   let dryRun = false;
   let help = false;
@@ -149,6 +163,18 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
       continue;
     }
 
+    if (arg === '--confirm') {
+      const value = argv[index + 1];
+
+      if (!value || value.startsWith('-')) {
+        return createParsedError('--confirm 需要远端锁路径', configPath);
+      }
+
+      confirmPath = value;
+      index += 1;
+      continue;
+    }
+
     if (arg.startsWith('-')) {
       return createParsedError(`未知选项: ${arg}`, configPath);
     }
@@ -159,6 +185,7 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
   return {
     args: args.slice(1),
     command: args[0],
+    confirmPath,
     configPath,
     dryRun,
     help,
@@ -199,6 +226,10 @@ function createDefaultHandlers(configPath: string): CliHandlers {
     },
     doctor: async () => {
       return runDoctorFromFile(configPath, createRemoteClient);
+    },
+    unlock: async (options) => {
+      const config = await loadConfigFile(configPath);
+      return unlock(config, createRemoteClient(config), options);
     },
   };
 }
@@ -270,6 +301,25 @@ function printDoctorReport(report: DoctorReport, io: CliIo): void {
   }
 }
 
+function printUnlockResult(result: UnlockResult, io: CliIo): void {
+  if (!result.locked) {
+    io.log(`没有发现远端锁: ${result.lockPath}`);
+    return;
+  }
+
+  if (result.removed) {
+    io.log(`已删除远端锁: ${result.lockPath}`);
+    return;
+  }
+
+  io.log(`发现远端锁: ${result.lockPath}`);
+  io.log(`pid: ${result.pid ?? '未知'}`);
+  io.log(`创建时间: ${result.createdAt ?? '未知'}`);
+  io.log('不会自动删除远端锁');
+  io.log('确认没有发布或回滚任务后再执行:');
+  io.log(`ssh-release unlock --confirm ${result.lockPath}`);
+}
+
 function toRealPath(filePath: string): string {
   try {
     return realpathSync(filePath);
@@ -286,6 +336,7 @@ function printUsage(io: CliIo): void {
   ssh-release deploy --dry-run [--config <path>]
   ssh-release list [--config <path>]
   ssh-release rollback [version] [--config <path>]
+  ssh-release unlock [--confirm <lock-path>] [--config <path>]
   ssh-release --help
   ssh-release --version`);
 }
