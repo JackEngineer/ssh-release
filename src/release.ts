@@ -46,6 +46,30 @@ export interface DeployPlan {
   sourcePath: string;
   targetPath: string;
   currentSymlink?: string;
+  upload: DeployPlanUpload;
+  switch?: DeployPlanSwitch;
+  cleanup: DeployPlanCleanup;
+  verification: string[];
+}
+
+export interface DeployPlanUpload {
+  sourcePath: string;
+  archivePath: string;
+  manifestPath: string;
+  fileCount: number;
+  totalBytes: number;
+}
+
+export interface DeployPlanSwitch {
+  currentSymlink: string;
+  target: string;
+}
+
+export interface DeployPlanCleanup {
+  lockPath: string;
+  tempArchivePath: string;
+  keepReleases: number;
+  oldReleases: string;
 }
 
 export type DeployProgressStage = 'source' | 'lock' | 'package' | 'publish' | 'cleanup';
@@ -215,6 +239,16 @@ export async function createDeployPlan(
   options: Pick<DeployOptions, 'now'> = {},
 ): Promise<DeployPlan> {
   await ensureSourceExists(config.source.path);
+  const releaseDate = options.now ?? new Date();
+  const versionName = createVersionName(releaseDate);
+  const tempArchivePath = remoteJoin(config.target.path, config.target.tempDir, `${versionName}.tgz`);
+  const lockPath = remoteJoin(config.target.path, '.ssh-release.lock');
+  const manifest = await createReleaseManifest({
+    version: versionName,
+    createdAt: releaseDate,
+    sourcePath: config.source.path,
+    exclude: config.source.exclude,
+  });
 
   if (config.deploy.mode === 'overwrite') {
     return {
@@ -222,19 +256,65 @@ export async function createDeployPlan(
       mode: 'overwrite',
       sourcePath: config.source.path,
       targetPath: config.target.path,
+      upload: createDeployPlanUpload(config, manifest, tempArchivePath, remoteJoin(config.target.path, 'manifest.json')),
+      cleanup: {
+        lockPath,
+        tempArchivePath,
+        keepReleases: config.deploy.keepReleases,
+        oldReleases: 'overwrite 模式不清理版本目录',
+      },
+      verification: [
+        '目标目录存在',
+        'manifest.json hash 匹配',
+        '远端锁已清理',
+      ],
     };
   }
 
-  const versionName = createVersionName(options.now ?? new Date());
   const releasesPath = remoteJoin(config.target.path, config.target.releasesDir);
+  const releasePath = remoteJoin(releasesPath, versionName);
+  const currentSymlink = remoteJoin(config.target.path, config.target.currentSymlink);
+  const switchTarget = remoteJoin(config.target.releasesDir, versionName);
 
   return {
     dryRun: true,
     mode: 'release',
     version: versionName,
     sourcePath: config.source.path,
-    targetPath: remoteJoin(releasesPath, versionName),
-    currentSymlink: remoteJoin(config.target.path, config.target.currentSymlink),
+    targetPath: releasePath,
+    currentSymlink,
+    upload: createDeployPlanUpload(config, manifest, tempArchivePath, remoteJoin(releasePath, 'manifest.json')),
+    switch: {
+      currentSymlink,
+      target: switchTarget,
+    },
+    cleanup: {
+      lockPath,
+      tempArchivePath,
+      keepReleases: config.deploy.keepReleases,
+      oldReleases: `发布成功后保留最新 ${config.deploy.keepReleases} 个版本，并保留当前版本`,
+    },
+    verification: [
+      '版本目录存在',
+      'current 指向新版本',
+      'manifest.json hash 匹配',
+      '远端锁已清理',
+    ],
+  };
+}
+
+function createDeployPlanUpload(
+  config: SshReleaseConfig,
+  manifest: ReleaseManifest,
+  archivePath: string,
+  manifestPath: string,
+): DeployPlanUpload {
+  return {
+    sourcePath: config.source.path,
+    archivePath,
+    manifestPath,
+    fileCount: manifest.totals.files,
+    totalBytes: manifest.totals.bytes,
   };
 }
 

@@ -10,6 +10,7 @@
 - `ssh-release doctor [--config <path>]`
 - `ssh-release deploy [--config <path>]`
 - `ssh-release deploy --dry-run [--config <path>]`
+- `ssh-release deploy --plan [--config <path>]`
 - `ssh-release deploy --json --progress [--config <path>]`
 - `ssh-release list [--config <path>]`
 - `ssh-release rollback [version] [--config <path>]`
@@ -22,7 +23,8 @@
 - `--config <path>`：使用自定义配置文件。
 - `--json`：输出可机器解析的 JSON。
 - `--progress`：仅用于 `deploy --json --progress`，输出 NDJSON 阶段事件。
-- `--dry-run`：只生成发布计划，不修改远端。
+- `--dry-run`：只生成发布计划，不连接远端、不修改远端。
+- `--plan`：`deploy` 的发布计划预览别名，行为等同 `--dry-run`。
 - `--confirm <lock-path>`：显式确认要删除的远端锁路径。
 
 ## 退出码
@@ -88,6 +90,13 @@
 
 - `version`
 - `currentSymlink`
+
+`deploy --dry-run` 和 `deploy --plan` 结果包含：
+
+- `upload`：将上传的来源、远端临时压缩包路径、远端清单路径、文件数和总字节数。
+- `switch`：`release` 模式下将切换的 `current` 路径和目标。
+- `cleanup`：远端锁路径、远端临时压缩包路径和版本保留策略。
+- `verification`：发布后将执行的校验项。
 
 ## 配置契约
 

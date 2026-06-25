@@ -31,6 +31,7 @@ test('prints help and version without running command handlers', async () => {
   }), 0);
 
   assert.equal(stdout.some((line) => line.includes('ssh-release deploy --dry-run')), true);
+  assert.equal(stdout.some((line) => line.includes('ssh-release deploy --plan')), true);
   assert.equal(stdout.includes(packageJson.version), true);
   assert.deepEqual(stderr, []);
 });
@@ -220,6 +221,29 @@ test('passes dry-run option to deploy handler and prints deploy plan', async () 
           sourcePath: './dist',
           targetPath: '/var/www/site/releases/20260625-180000',
           currentSymlink: '/var/www/site/current',
+          upload: {
+            sourcePath: './dist',
+            archivePath: '/var/www/site/.ssh-release-tmp/20260625-180000.tgz',
+            manifestPath: '/var/www/site/releases/20260625-180000/manifest.json',
+            fileCount: 2,
+            totalBytes: 120,
+          },
+          switch: {
+            currentSymlink: '/var/www/site/current',
+            target: 'releases/20260625-180000',
+          },
+          cleanup: {
+            lockPath: '/var/www/site/.ssh-release.lock',
+            tempArchivePath: '/var/www/site/.ssh-release-tmp/20260625-180000.tgz',
+            keepReleases: 5,
+            oldReleases: '发布成功后保留最新 5 个版本，并保留当前版本',
+          },
+          verification: [
+            '版本目录存在',
+            'current 指向新版本',
+            'manifest.json hash 匹配',
+            '远端锁已清理',
+          ],
         };
       },
     },
@@ -229,6 +253,53 @@ test('passes dry-run option to deploy handler and prints deploy plan', async () 
   assert.equal(stdout.includes('发布预检通过，不会修改远程服务器'), true);
   assert.equal(stdout.includes('模式: release'), true);
   assert.equal(stdout.includes('源路径: ./dist'), true);
+  assert.equal(stdout.includes('计划上传: ./dist -> /var/www/site/.ssh-release-tmp/20260625-180000.tgz'), true);
+  assert.equal(stdout.includes('计划清单: /var/www/site/releases/20260625-180000/manifest.json'), true);
+  assert.equal(stdout.includes('计划切换: /var/www/site/current -> releases/20260625-180000'), true);
+  assert.equal(stdout.includes('计划清理: /var/www/site/.ssh-release-tmp/20260625-180000.tgz'), true);
+});
+
+test('accepts deploy --plan as a dry-run preview alias', async () => {
+  const receivedOptions: unknown[] = [];
+
+  assert.equal(await runCli(['deploy', '--plan'], {
+    io: {
+      log: () => undefined,
+      error: () => undefined,
+    },
+    handlers: {
+      ...createFailingHandlers(),
+      deploy: async (options?: unknown) => {
+        receivedOptions.push(options);
+        return {
+          dryRun: true as const,
+          mode: 'overwrite' as const,
+          sourcePath: './dist',
+          targetPath: '/var/www/site',
+          upload: {
+            sourcePath: './dist',
+            archivePath: '/var/www/site/.ssh-release-tmp/20260625-180000.tgz',
+            manifestPath: '/var/www/site/manifest.json',
+            fileCount: 1,
+            totalBytes: 10,
+          },
+          cleanup: {
+            lockPath: '/var/www/site/.ssh-release.lock',
+            tempArchivePath: '/var/www/site/.ssh-release-tmp/20260625-180000.tgz',
+            keepReleases: 5,
+            oldReleases: 'overwrite 模式不清理版本目录',
+          },
+          verification: [
+            '目标目录存在',
+            'manifest.json hash 匹配',
+            '远端锁已清理',
+          ],
+        };
+      },
+    },
+  }), 0);
+
+  assert.deepEqual(receivedOptions, [{ dryRun: true }]);
 });
 
 test('prints command results as a single json object', async () => {
@@ -249,6 +320,29 @@ test('prints command results as a single json object', async () => {
         sourcePath: './dist',
         targetPath: '/var/www/site/releases/20260625-180000',
         currentSymlink: '/var/www/site/current',
+        upload: {
+          sourcePath: './dist',
+          archivePath: '/var/www/site/.ssh-release-tmp/20260625-180000.tgz',
+          manifestPath: '/var/www/site/releases/20260625-180000/manifest.json',
+          fileCount: 2,
+          totalBytes: 120,
+        },
+        switch: {
+          currentSymlink: '/var/www/site/current',
+          target: 'releases/20260625-180000',
+        },
+        cleanup: {
+          lockPath: '/var/www/site/.ssh-release.lock',
+          tempArchivePath: '/var/www/site/.ssh-release-tmp/20260625-180000.tgz',
+          keepReleases: 5,
+          oldReleases: '发布成功后保留最新 5 个版本，并保留当前版本',
+        },
+        verification: [
+          '版本目录存在',
+          'current 指向新版本',
+          'manifest.json hash 匹配',
+          '远端锁已清理',
+        ],
       }),
     },
   }), 0);
@@ -264,6 +358,29 @@ test('prints command results as a single json object', async () => {
       sourcePath: './dist',
       targetPath: '/var/www/site/releases/20260625-180000',
       currentSymlink: '/var/www/site/current',
+      upload: {
+        sourcePath: './dist',
+        archivePath: '/var/www/site/.ssh-release-tmp/20260625-180000.tgz',
+        manifestPath: '/var/www/site/releases/20260625-180000/manifest.json',
+        fileCount: 2,
+        totalBytes: 120,
+      },
+      switch: {
+        currentSymlink: '/var/www/site/current',
+        target: 'releases/20260625-180000',
+      },
+      cleanup: {
+        lockPath: '/var/www/site/.ssh-release.lock',
+        tempArchivePath: '/var/www/site/.ssh-release-tmp/20260625-180000.tgz',
+        keepReleases: 5,
+        oldReleases: '发布成功后保留最新 5 个版本，并保留当前版本',
+      },
+      verification: [
+        '版本目录存在',
+        'current 指向新版本',
+        'manifest.json hash 匹配',
+        '远端锁已清理',
+      ],
     },
   });
   assert.deepEqual(stderr, []);

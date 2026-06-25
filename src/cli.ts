@@ -260,7 +260,7 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
       continue;
     }
 
-    if (arg === '--dry-run') {
+    if (arg === '--dry-run' || arg === '--plan') {
       dryRun = true;
       continue;
     }
@@ -356,13 +356,25 @@ function printDeployResult(result: DeployResult | DeployPlan, io: CliIo): void {
     io.log(`模式: ${result.mode}`);
     io.log(`源路径: ${result.sourcePath}`);
     io.log(`目标目录: ${result.targetPath}`);
+    io.log(`计划上传: ${result.upload.sourcePath} -> ${result.upload.archivePath}`);
+    io.log(`计划清单: ${result.upload.manifestPath}`);
+    io.log(`计划文件: ${result.upload.fileCount} 个，${result.upload.totalBytes} 字节`);
 
     if (result.version) {
       io.log(`计划版本: ${result.version}`);
     }
 
-    if (result.currentSymlink) {
+    if (result.switch) {
+      io.log(`计划切换: ${result.switch.currentSymlink} -> ${result.switch.target}`);
+    } else if (result.currentSymlink) {
       io.log(`计划切换: ${result.currentSymlink}`);
+    }
+
+    io.log(`计划清理: ${result.cleanup.tempArchivePath}`);
+    io.log(`版本保留: ${result.cleanup.oldReleases}`);
+
+    for (const verification of result.verification) {
+      io.log(`计划校验: ${verification}`);
     }
 
     return;
@@ -492,6 +504,7 @@ function createUsageText(): string {
   ssh-release doctor [--config <path>]
   ssh-release deploy [--config <path>]
   ssh-release deploy --dry-run [--config <path>]
+  ssh-release deploy --plan [--config <path>]
   ssh-release deploy --json --progress [--config <path>]
   ssh-release list [--config <path>]
   ssh-release rollback [version] [--config <path>]

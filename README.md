@@ -18,6 +18,7 @@
 - `ssh-release unlock`：查看远端锁，并在显式确认锁路径后删除锁。
 - `--json`：输出单行 JSON，便于 CI/CD 解析。
 - `deploy --json --progress`：发布时输出 NDJSON 阶段进度，便于 CI/CD 展示实时状态。
+- `deploy --plan`：不连接远端、不修改服务器，预览上传、切换、清理和校验计划。
 - 发布 manifest：每次发布生成 `manifest.json`，记录版本、发布时间、本地来源、文件清单、文件大小和 SHA-256。
 - 发布后远端校验：确认版本目录或目标目录存在、`current` 已指向新版本、`manifest.json` hash 匹配、远端锁已清理。
 - `release` 模式：上传压缩包、远端解压、切换 `current`、清理旧版本。
@@ -180,6 +181,7 @@ ssh-release doctor
 
 ```bash
 ssh-release deploy --dry-run
+ssh-release deploy --plan
 ```
 
 执行发布：
@@ -187,6 +189,14 @@ ssh-release deploy --dry-run
 ```bash
 ssh-release deploy
 ```
+
+`deploy --dry-run` 和 `deploy --plan` 都不会连接远端或修改服务器，会预览：
+
+- 将上传的本地来源和远端临时压缩包路径。
+- 将写入的远端 `manifest.json` 路径、文件数量和总字节数。
+- `release` 模式下将切换的 `current` 目标。
+- 将清理的远端临时压缩包，以及旧版本保留策略。
+- 发布后会执行的远端校验项。
 
 `release` 模式发布成功后会输出版本号、版本目录、`current` 软链接路径和远端 `manifest.json` 路径。只有压缩包上传、解压和发布清单上传完成后才切换 `current`。
 
@@ -249,6 +259,7 @@ ssh-release rollback 20260625-150000
 
 ```bash
 ssh-release deploy --dry-run --json
+ssh-release deploy --plan --json
 ssh-release deploy --json --progress
 ssh-release doctor --json
 ssh-release list --json

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { type TestContext } from 'node:test';
@@ -47,6 +47,7 @@ test('creates a deploy dry-run plan without remote side effects', async (t) => {
   });
   const sourcePath = join(tempDir, 'dist');
   await mkdir(sourcePath);
+  await writeFile(join(sourcePath, 'index.html'), '<h1>ok</h1>');
 
   const config: SshReleaseConfig = {
     source: {
@@ -83,6 +84,92 @@ test('creates a deploy dry-run plan without remote side effects', async (t) => {
     sourcePath,
     targetPath: '/var/www/site/releases/20260625-180000',
     currentSymlink: '/var/www/site/current',
+    upload: {
+      sourcePath,
+      archivePath: '/var/www/site/.ssh-release-tmp/20260625-180000.tgz',
+      manifestPath: '/var/www/site/releases/20260625-180000/manifest.json',
+      fileCount: 1,
+      totalBytes: Buffer.byteLength('<h1>ok</h1>'),
+    },
+    switch: {
+      currentSymlink: '/var/www/site/current',
+      target: 'releases/20260625-180000',
+    },
+    cleanup: {
+      lockPath: '/var/www/site/.ssh-release.lock',
+      tempArchivePath: '/var/www/site/.ssh-release-tmp/20260625-180000.tgz',
+      keepReleases: 5,
+      oldReleases: '发布成功后保留最新 5 个版本，并保留当前版本',
+    },
+    verification: [
+      '版本目录存在',
+      'current 指向新版本',
+      'manifest.json hash 匹配',
+      '远端锁已清理',
+    ],
+  });
+});
+
+test('creates an overwrite deploy plan with upload and cleanup details', async (t) => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'ssh-release-overwrite-plan-'));
+  t.after(async () => {
+    await rm(tempDir, { force: true, recursive: true });
+  });
+  const sourcePath = join(tempDir, 'dist');
+  await mkdir(sourcePath);
+  await writeFile(join(sourcePath, 'index.html'), '<h1>ok</h1>');
+
+  const config: SshReleaseConfig = {
+    source: {
+      path: sourcePath,
+      exclude: [],
+    },
+    server: {
+      host: 'example.com',
+      port: 22,
+      username: 'deploy',
+      privateKeyPath: '/tmp/id_rsa',
+    },
+    target: {
+      path: '/var/www/site',
+      currentSymlink: 'current',
+      releasesDir: 'releases',
+      tempDir: '.ssh-release-tmp',
+    },
+    deploy: {
+      mode: 'overwrite',
+      keepReleases: 5,
+      compression: 'tgz',
+      preferTar: true,
+      fallbackToFileUpload: true,
+    },
+  };
+
+  assert.deepEqual(await createDeployPlan(config, {
+    now: new Date('2026-06-25T18:00:00+08:00'),
+  }), {
+    dryRun: true,
+    mode: 'overwrite',
+    sourcePath,
+    targetPath: '/var/www/site',
+    upload: {
+      sourcePath,
+      archivePath: '/var/www/site/.ssh-release-tmp/20260625-180000.tgz',
+      manifestPath: '/var/www/site/manifest.json',
+      fileCount: 1,
+      totalBytes: Buffer.byteLength('<h1>ok</h1>'),
+    },
+    cleanup: {
+      lockPath: '/var/www/site/.ssh-release.lock',
+      tempArchivePath: '/var/www/site/.ssh-release-tmp/20260625-180000.tgz',
+      keepReleases: 5,
+      oldReleases: 'overwrite 模式不清理版本目录',
+    },
+    verification: [
+      '目标目录存在',
+      'manifest.json hash 匹配',
+      '远端锁已清理',
+    ],
   });
 });
 
