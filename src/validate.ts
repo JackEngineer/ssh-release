@@ -41,6 +41,8 @@ export function normalizeConfig(input: SshReleaseConfigInput): SshReleaseConfig 
   const compression = input.deploy?.compression ?? 'tgz';
   const keepReleases = input.deploy?.keepReleases ?? 5;
   const port = input.server?.port ?? 22;
+  const privateKeyPath = optionalString(input.server?.privateKeyPath);
+  const password = optionalString(input.server?.password);
 
   if (mode !== 'release' && mode !== 'overwrite') {
     throw new Error('deploy.mode 只支持 release 或 overwrite');
@@ -68,6 +70,10 @@ export function normalizeConfig(input: SshReleaseConfigInput): SshReleaseConfig 
     throw new Error('source.exclude 必须是字符串数组');
   }
 
+  if (!privateKeyPath && !password) {
+    throw new Error('server.privateKeyPath 或 server.password 必须配置一个');
+  }
+
   return {
     source: {
       path: requiredString(input.source?.path, 'source.path'),
@@ -77,7 +83,8 @@ export function normalizeConfig(input: SshReleaseConfigInput): SshReleaseConfig 
       host: requiredString(input.server?.host, 'server.host'),
       port,
       username: requiredString(input.server?.username, 'server.username'),
-      privateKeyPath: requiredString(input.server?.privateKeyPath, 'server.privateKeyPath'),
+      privateKeyPath,
+      password,
     },
     target: {
       path: validateTargetPath(requiredString(input.target?.path, 'target.path')),
@@ -98,6 +105,14 @@ export function normalizeConfig(input: SshReleaseConfigInput): SshReleaseConfig 
 function requiredString(value: string | undefined, fieldName: string): string {
   if (!value || !value.trim()) {
     throw new Error(`${fieldName} 不能为空`);
+  }
+
+  return value.trim();
+}
+
+function optionalString(value: string | undefined): string | undefined {
+  if (!value || !value.trim()) {
+    return undefined;
   }
 
   return value.trim();

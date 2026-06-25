@@ -40,6 +40,42 @@ test('loads and normalizes a TypeScript config file', async () => {
   assert.equal(config.deploy.mode, 'release');
 });
 
+test('loads password authentication from environment without requiring a private key', async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'ssh-release-password-config-'));
+  const configPath = path.join(directory, 'ssh-release.config.ts');
+  const previousPassword = process.env.SSH_RELEASE_PASSWORD;
+
+  process.env.SSH_RELEASE_PASSWORD = 'secret-password';
+
+  await writeFile(configPath, `export default {
+  source: {
+    path: './public',
+  },
+  server: {
+    host: 'example.com',
+    username: 'deploy',
+    password: process.env.SSH_RELEASE_PASSWORD,
+  },
+  target: {
+    path: '/var/www/site',
+  },
+};
+`);
+
+  try {
+    const config = await loadConfigFile(configPath);
+
+    assert.equal(config.server.password, 'secret-password');
+    assert.equal(config.server.privateKeyPath, undefined);
+  } finally {
+    if (previousPassword === undefined) {
+      delete process.env.SSH_RELEASE_PASSWORD;
+    } else {
+      process.env.SSH_RELEASE_PASSWORD = previousPassword;
+    }
+  }
+});
+
 test('resolveUserPath expands a leading home directory marker', () => {
   assert.equal(resolveUserPath('~/.ssh/id_rsa'), path.join(os.homedir(), '.ssh/id_rsa'));
   assert.equal(resolveUserPath('/tmp/id_rsa'), '/tmp/id_rsa');

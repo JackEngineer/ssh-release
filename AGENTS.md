@@ -51,6 +51,6 @@ Pull Request 应包含变更摘要、验证步骤和行为影响。有关联 iss
 
 ## 安全与配置提示
 
-不要提交私钥、密码、真实服务器 IP 或生产路径。配置示例应使用 `SSH_RELEASE_HOST`、`SSH_RELEASE_USER` 等环境变量。
+不要提交私钥、密码、真实服务器 IP 或生产路径。配置示例应使用 `SSH_RELEASE_HOST`、`SSH_RELEASE_USER`、`SSH_RELEASE_PASSWORD` 等环境变量。
 
 保持第一版边界：本工具只发布文件并切换版本，不重启服务、不修改 Nginx、不执行自定义远程 hook。

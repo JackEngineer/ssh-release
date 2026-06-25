@@ -79,6 +79,7 @@ export default {
     host: process.env.SSH_RELEASE_HOST,
     port: 22,
     username: process.env.SSH_RELEASE_USER,
+    password: process.env.SSH_RELEASE_PASSWORD,
     privateKeyPath: '~/.ssh/id_rsa',
   },
 
@@ -174,7 +175,16 @@ ssh-release rollback 20260625-150000
 ```bash
 export SSH_RELEASE_HOST=example.com
 export SSH_RELEASE_USER=deploy
+export SSH_RELEASE_PASSWORD='your-password'
 ```
+
+认证方式支持私钥和密码：
+
+- 设置 `server.privateKeyPath` 时使用私钥登录。
+- 设置 `server.password` 时使用密码登录，推荐写成 `process.env.SSH_RELEASE_PASSWORD`。
+- 同时设置 `password` 和 `privateKeyPath` 时，优先使用密码登录。
+- 密码不会作为命令行参数传给 `ssh` 或 `scp`，运行时通过 `SSHPASS` 环境变量交给 `sshpass -e`。
+- 不要把真实密码写进 `ssh-release.config.ts` 或仓库文件。
 
 以下远程目标路径会被默认拒绝：
 
@@ -196,6 +206,7 @@ export SSH_RELEASE_USER=deploy
 - `tar`：本地打包发布内容。
 - `ssh`：执行远端目录、解压、软链接、列表和检查命令。
 - `scp`：上传压缩包和逐文件回退上传。
+- `sshpass`：仅密码登录时需要；私钥登录不需要。
 
 在 macOS 上打包时会禁用 AppleDouble 和扩展属性元数据，避免把 `._*` 文件发布到 Linux 服务器。
 

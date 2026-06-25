@@ -11,45 +11,23 @@ export interface RemoteClient {
   uploadDirectory(localPath: string, remotePath: string, exclude: string[]): Promise<void>;
 }
 
-export class ShellRemoteClient implements RemoteClient {
-  private readonly destination: string;
-  private readonly sshArgs: string[];
-  private readonly scpArgs: string[];
+export interface ProcessSpec {
+  command: string;
+  args: string[];
+  env?: NodeJS.ProcessEnv;
+}
 
-  constructor(private readonly server: SshReleaseConfig['server']) {
-    this.destination = `${server.username}@${server.host}`;
-    this.sshArgs = [
-      '-p',
-      String(server.port),
-      '-i',
-      server.privateKeyPath,
-      '-o',
-      'BatchMode=yes',
-    ];
-    this.scpArgs = [
-      '-P',
-      String(server.port),
-      '-i',
-      server.privateKeyPath,
-      '-o',
-      'BatchMode=yes',
-    ];
-  }
+export class ShellRemoteClient implements RemoteClient {
+  constructor(private readonly server: SshReleaseConfig['server']) {}
 
   async exec(command: string): Promise<ProcessResult> {
-    return runProcess('ssh', [
-      ...this.sshArgs,
-      this.destination,
-      command,
-    ]);
+    const spec = createSshProcessSpec(this.server, command);
+    return runProcess(spec.command, spec.args, { env: spec.env });
   }
 
   async uploadFile(localPath: string, remotePath: string): Promise<void> {
-    await runProcess('scp', [
-      ...this.scpArgs,
-      localPath,
-      createScpRemoteTarget(this.destination, remotePath),
-    ]);
+    const spec = createScpProcessSpec(this.server, localPath, remotePath);
+    await runProcess(spec.command, spec.args, { env: spec.env });
   }
 
   async uploadDirectory(localPath: string, remotePath: string, exclude: string[]): Promise<void> {
@@ -63,6 +41,107 @@ export function createRemoteClient(config: SshReleaseConfig): RemoteClient {
 
 export function createScpRemoteTarget(destination: string, remotePath: string): string {
   return `${destination}:${remotePath}`;
+}
+
+export function createSshProcessSpec(
+  server: SshReleaseConfig['server'],
+  remoteCommand: string,
+): ProcessSpec {
+  const destination = `${server.username}@${server.host}`;
+
+  if (server.password) {
+    return {
+      command: 'sshpass',
+      args: [
+        '-e',
+        'ssh',
+        '-p',
+        String(server.port),
+        '-o',
+        'StrictHostKeyChecking=accept-new',
+        '-o',
+        'PreferredAuthentications=password',
+        '-o',
+        'PubkeyAuthentication=no',
+        '-o',
+        'NumberOfPasswordPrompts=1',
+        destination,
+        remoteCommand,
+      ],
+      env: {
+        SSHPASS: server.password,
+      },
+    };
+  }
+
+  return {
+    command: 'ssh',
+    args: [
+      '-p',
+      String(server.port),
+      '-i',
+      requirePrivateKeyPath(server),
+      '-o',
+      'BatchMode=yes',
+      destination,
+      remoteCommand,
+    ],
+  };
+}
+
+export function createScpProcessSpec(
+  server: SshReleaseConfig['server'],
+  localPath: string,
+  remotePath: string,
+): ProcessSpec {
+  const destination = `${server.username}@${server.host}`;
+
+  if (server.password) {
+    return {
+      command: 'sshpass',
+      args: [
+        '-e',
+        'scp',
+        '-P',
+        String(server.port),
+        '-o',
+        'StrictHostKeyChecking=accept-new',
+        '-o',
+        'PreferredAuthentications=password',
+        '-o',
+        'PubkeyAuthentication=no',
+        '-o',
+        'NumberOfPasswordPrompts=1',
+        localPath,
+        createScpRemoteTarget(destination, remotePath),
+      ],
+      env: {
+        SSHPASS: server.password,
+      },
+    };
+  }
+
+  return {
+    command: 'scp',
+    args: [
+      '-P',
+      String(server.port),
+      '-i',
+      requirePrivateKeyPath(server),
+      '-o',
+      'BatchMode=yes',
+      localPath,
+      createScpRemoteTarget(destination, remotePath),
+    ],
+  };
+}
+
+function requirePrivateKeyPath(server: SshReleaseConfig['server']): string {
+  if (!server.privateKeyPath) {
+    throw new Error('server.privateKeyPath 或 server.password 必须配置一个');
+  }
+
+  return server.privateKeyPath;
 }
 
 async function uploadDirectoryContents(

@@ -84,6 +84,7 @@ export default {
     host: process.env.SSH_RELEASE_HOST,
     port: 22,
     username: process.env.SSH_RELEASE_USER,
+    password: process.env.SSH_RELEASE_PASSWORD,
     privateKeyPath: '~/.ssh/id_rsa',
   },
 
@@ -111,6 +112,7 @@ export default {
 - `server.host`：目标服务器地址。
 - `server.port`：SSH 端口，默认 `22`。
 - `server.username`：SSH 用户名。
+- `server.password`：SSH 密码，推荐只从 `SSH_RELEASE_PASSWORD` 环境变量读取。
 - `server.privateKeyPath`：SSH 私钥路径，支持 `~` 展开。
 - `target.path`：远程发布根目录。
 - `target.currentSymlink`：当前版本软链接名。
@@ -284,8 +286,10 @@ ssh-release doctor
 
 - 默认推荐私钥登录。
 - 支持从环境变量读取服务器地址、用户名等信息。
-- 第一版不把明文密码写入模板。
-- 如果后续支持密码，也只从环境变量读取。
+- 支持密码登录，但只推荐从 `SSH_RELEASE_PASSWORD` 环境变量读取。
+- 配置模板不写入明文密码。
+- 同时配置 `server.password` 和 `server.privateKeyPath` 时，优先使用密码登录。
+- 密码登录依赖本地 `sshpass`，运行时通过 `SSHPASS` 环境变量传递密码，不把密码放入命令行参数。
 
 远程命令边界：
 

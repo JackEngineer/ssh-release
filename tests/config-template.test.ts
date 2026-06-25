@@ -8,7 +8,8 @@ test('creates config template without real secrets or hosts', () => {
 
   assert.match(template, /SSH_RELEASE_HOST/);
   assert.match(template, /SSH_RELEASE_USER/);
+  assert.match(template, /SSH_RELEASE_PASSWORD/);
   assert.match(template, /privateKeyPath: '~\/\.ssh\/id_rsa'/);
-  assert.doesNotMatch(template, /password/i);
+  assert.doesNotMatch(template, /password:\s*['"`]/i);
   assert.doesNotMatch(template, /\b\d{1,3}(?:\.\d{1,3}){3}\b/);
 });

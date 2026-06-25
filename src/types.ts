@@ -11,7 +11,8 @@ export interface SshReleaseConfig {
     host: string;
     port: number;
     username: string;
-    privateKeyPath: string;
+    privateKeyPath?: string;
+    password?: string;
   };
   target: {
     path: string;
@@ -38,6 +39,7 @@ export interface SshReleaseConfigInput {
     port?: number;
     username?: string;
     privateKeyPath?: string;
+    password?: string;
   };
   target?: {
     path?: string;

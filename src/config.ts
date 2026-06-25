@@ -19,6 +19,7 @@ export function createConfigTemplate(): string {
     host: process.env.SSH_RELEASE_HOST,
     port: 22,
     username: process.env.SSH_RELEASE_USER,
+    password: process.env.SSH_RELEASE_PASSWORD,
     privateKeyPath: '~/.ssh/id_rsa',
   },
 
@@ -53,7 +54,9 @@ export async function loadConfigFile(configPath = CONFIG_FILE_NAME): Promise<Ssh
     ...config,
     server: {
       ...config.server,
-      privateKeyPath: resolveUserPath(config.server.privateKeyPath),
+      privateKeyPath: config.server.privateKeyPath
+        ? resolveUserPath(config.server.privateKeyPath)
+        : undefined,
     },
   };
 }

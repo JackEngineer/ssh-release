@@ -33,6 +33,33 @@ test('fills documented defaults for optional config fields', () => {
   assert.equal(config.deploy.fallbackToFileUpload, true);
 });
 
+test('accepts password authentication without private key path', () => {
+  const config = normalizeConfig({
+    ...baseConfig,
+    server: {
+      host: 'example.com',
+      username: 'deploy',
+      password: 'secret-password',
+    },
+  });
+
+  assert.equal(config.server.password, 'secret-password');
+  assert.equal(config.server.privateKeyPath, undefined);
+});
+
+test('requires either private key path or password for authentication', () => {
+  assert.throws(
+    () => normalizeConfig({
+      ...baseConfig,
+      server: {
+        host: 'example.com',
+        username: 'deploy',
+      },
+    }),
+    /server.privateKeyPath 或 server.password/,
+  );
+});
+
 test('rejects dangerous top-level remote target paths', () => {
   assert.throws(
     () => validateTargetPath('/var'),
