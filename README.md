@@ -151,8 +151,8 @@ source files -> package -> upload -> release -> activate -> rollback
 
 规则：
 
-- 发布开始前会创建 `.ssh-release.lock`，避免同一目标目录并发发布。
-- 发布结束或失败后会自动删除 `.ssh-release.lock`。
+- 发布和回滚开始前会创建 `.ssh-release.lock`，避免同一目标目录并发修改。
+- 发布或回滚结束后会自动删除 `.ssh-release.lock`。
 - 每次发布创建一个新版本目录。
 - 新版本完整上传和解压完成后，才切换 `current`。
 - 回滚只切换 `current`，不删除版本目录。
@@ -182,7 +182,7 @@ ssh-release deploy
 
 `release` 模式发布成功后会输出版本号、版本目录和 `current` 软链接路径。只有压缩包上传和解压完成后才切换 `current`。
 
-如果远端已有 `.ssh-release.lock`，说明同一目标目录可能正在发布，工具会停止在打包和上传之前。确认没有发布任务运行后，可以手动删除 `target.path/.ssh-release.lock` 再重试。
+如果远端已有 `.ssh-release.lock`，说明同一目标目录可能正在发布或回滚，工具会停止在修改远端状态之前。确认没有任务运行后，可以手动删除 `target.path/.ssh-release.lock` 再重试。
 
 远端 `tar` 不可用或解压失败时，如果 `deploy.fallbackToFileUpload` 为 `true`，工具会回退逐文件上传。`release` 模式只清理失败的新版本目录；`overwrite` 模式不会先删除整个目标目录。
 
@@ -303,6 +303,7 @@ src/
 ├── cli.ts
 ├── config.ts
 ├── doctor.ts
+├── lock.ts
 ├── list.ts
 ├── package.ts
 ├── process.ts
@@ -345,7 +346,7 @@ docs/
 - 本地 `.tgz` 打包和排除项。
 - macOS AppleDouble 元数据排除。
 - `release` 和 `overwrite` 发布流程。
-- 发布锁获取、释放和锁冲突拦截。
+- 发布和回滚锁获取、释放和锁冲突拦截。
 - 远端 `tar` 失败后的逐文件上传回退。
 - 远程版本列表读取和当前版本标记。
 - `doctor` 检查结果。

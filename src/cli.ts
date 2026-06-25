@@ -242,6 +242,10 @@ function printDeployResult(result: DeployResult | DeployPlan, io: CliIo): void {
 function printRollbackResult(result: RollbackResult, io: CliIo): void {
   io.log(`已回滚到版本: ${result.version}`);
   io.log(`当前指向: ${result.currentSymlink}`);
+
+  for (const warning of result.warnings) {
+    io.log(`警告: ${warning}`);
+  }
 }
 
 function printListResult(result: ListReleasesResult, io: CliIo): void {

@@ -5,6 +5,7 @@ import {
   type CreateReleasePackageOptions,
   type ReleasePackage,
 } from './package.js';
+import { acquireRemoteLock } from './lock.js';
 import {
   readRemoteReleaseNames,
   remoteJoin,
@@ -35,8 +36,6 @@ export interface DeployOptions {
   now?: Date;
   createPackage?: (options: CreateReleasePackageOptions) => Promise<ReleasePackage>;
 }
-
-const deployLockDir = '.ssh-release.lock';
 
 export function createVersionName(date = new Date()): string {
   return [
@@ -82,8 +81,7 @@ export async function deploy(
 
   const versionName = createVersionName(options.now ?? new Date());
   const packageFactory = options.createPackage ?? createReleasePackage;
-  const lockPath = remoteJoin(config.target.path, deployLockDir);
-  const releaseLock = await acquireRemoteDeployLock(config, client, lockPath);
+  const releaseLock = await acquireRemoteLock(config, client);
   let releasePackage: ReleasePackage | undefined;
   let result: DeployResult | undefined;
   let deployError: unknown;
@@ -196,23 +194,6 @@ async function deployRelease(
     currentSymlink: currentSymlinkPath,
     usedFallback,
     warnings,
-  };
-}
-
-async function acquireRemoteDeployLock(
-  config: SshReleaseConfig,
-  client: RemoteClient,
-  lockPath: string,
-): Promise<() => Promise<void>> {
-  const createdAtPath = remoteJoin(lockPath, 'created_at');
-  const pidPath = remoteJoin(lockPath, 'pid');
-  const lockedMessage = `远程已有发布任务正在运行，请确认后删除 ${lockPath}`;
-  const command = `mkdir -p ${shellQuote(config.target.path)} && if mkdir ${shellQuote(lockPath)} 2>/dev/null; then printf '%s\\n' "$$" > ${shellQuote(pidPath)}; date -u '+%Y-%m-%dT%H:%M:%SZ' > ${shellQuote(createdAtPath)}; else echo ${shellQuote(lockedMessage)} >&2; exit 73; fi`;
-
-  await client.exec(command);
-
-  return async () => {
-    await client.exec(`rm -rf ${shellQuote(lockPath)}`);
   };
 }
 

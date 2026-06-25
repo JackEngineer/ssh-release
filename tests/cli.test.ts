@@ -65,6 +65,7 @@ test('dispatches deploy, rollback, list, and doctor commands', async () => {
         return {
           version: version ?? '20260625-150000',
           currentSymlink: '/var/www/site/current',
+          warnings: [],
         };
       },
       list: async () => {

@@ -4,6 +4,7 @@ import {
   remoteJoin,
   shellQuote,
 } from './remote.js';
+import { acquireRemoteLock } from './lock.js';
 import type { RemoteClient } from './ssh.js';
 import type { SshReleaseConfig } from './types.js';
 
@@ -16,6 +17,7 @@ export interface RollbackSelection {
 export interface RollbackResult {
   version: string;
   currentSymlink: string;
+  warnings: string[];
 }
 
 export function selectRollbackTarget(selection: RollbackSelection): string {
@@ -51,25 +53,52 @@ export async function rollback(
     throw new Error('overwrite 模式不支持回滚');
   }
 
-  const releasesPath = remoteJoin(config.target.path, config.target.releasesDir);
-  const currentSymlinkPath = remoteJoin(config.target.path, config.target.currentSymlink);
-  const releases = await readRemoteReleaseNames(client, releasesPath);
-  const currentVersion = await readCurrentVersion(client, currentSymlinkPath);
+  const releaseLock = await acquireRemoteLock(config, client, { createTargetPath: false });
+  let result: RollbackResult | undefined;
+  let rollbackError: unknown;
 
-  if (!currentVersion) {
-    throw new Error('当前版本不存在');
+  try {
+    const releasesPath = remoteJoin(config.target.path, config.target.releasesDir);
+    const currentSymlinkPath = remoteJoin(config.target.path, config.target.currentSymlink);
+    const releases = await readRemoteReleaseNames(client, releasesPath);
+    const currentVersion = await readCurrentVersion(client, currentSymlinkPath);
+
+    if (!currentVersion) {
+      throw new Error('当前版本不存在');
+    }
+
+    const targetVersion = selectRollbackTarget({
+      releases,
+      currentVersion,
+      requestedVersion,
+    });
+
+    await client.exec(`ln -sfn ${shellQuote(remoteJoin(config.target.releasesDir, targetVersion))} ${shellQuote(currentSymlinkPath)}`);
+
+    result = {
+      version: targetVersion,
+      currentSymlink: currentSymlinkPath,
+      warnings: [],
+    };
+    return result;
+  } catch (error) {
+    rollbackError = error;
+    throw error;
+  } finally {
+    try {
+      await releaseLock();
+    } catch (error) {
+      const message = `远程发布锁清理失败: ${formatError(error)}`;
+
+      if (result) {
+        result.warnings.push(message);
+      } else if (!rollbackError) {
+        throw error;
+      }
+    }
   }
+}
 
-  const targetVersion = selectRollbackTarget({
-    releases,
-    currentVersion,
-    requestedVersion,
-  });
-
-  await client.exec(`ln -sfn ${shellQuote(remoteJoin(config.target.releasesDir, targetVersion))} ${shellQuote(currentSymlinkPath)}`);
-
-  return {
-    version: targetVersion,
-    currentSymlink: currentSymlinkPath,
-  };
+function formatError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

@@ -51,8 +51,11 @@ test('rolls back to the previous remote release by switching current symlink', a
   const result = await rollback(createConfig(), client);
 
   assert.equal(result.version, '20260625-121000');
+  assert.equal(result.warnings.length, 0);
+  assert.equal(client.commands[0].includes('/var/www/site/.ssh-release.lock'), true);
   assert.ok(client.commands.some((command) => command.includes("ln -sfn 'releases/20260625-121000' '/var/www/site/current'")));
-  assert.equal(client.commands.some((command) => command.includes('rm -rf')), false);
+  assert.equal(client.commands.at(-1), "rm -rf '/var/www/site/.ssh-release.lock'");
+  assert.equal(client.commands.some((command) => command.includes("rm -rf '/var/www/site/releases")), false);
 });
 
 test('rejects rollback in overwrite mode before touching remote state', async () => {
@@ -65,11 +68,30 @@ test('rejects rollback in overwrite mode before touching remote state', async ()
   assert.deepEqual(client.commands, []);
 });
 
+test('stops rollback before reading remote state when the remote lock exists', async () => {
+  const client = new FakeRemoteClient();
+  client.failLock = true;
+
+  await assert.rejects(
+    () => rollback(createConfig(), client),
+    /远程已有发布任务正在运行/,
+  );
+  assert.equal(client.commands.length, 1);
+  assert.equal(client.commands[0].includes('/var/www/site/.ssh-release.lock'), true);
+  assert.equal(client.commands.some((command) => command.includes('for release_path in')), false);
+  assert.equal(client.commands.some((command) => command.includes('readlink')), false);
+});
+
 class FakeRemoteClient implements RemoteClient {
   commands: string[] = [];
+  failLock = false;
 
   async exec(command: string): Promise<{ stdout: string; stderr: string }> {
     this.commands.push(command);
+
+    if (this.failLock && command.includes('/var/www/site/.ssh-release.lock')) {
+      throw new Error('远程已有发布任务正在运行');
+    }
 
     if (command.includes('for release_path in')) {
       return { stdout: `${releases.join('\n')}\n`, stderr: '' };
