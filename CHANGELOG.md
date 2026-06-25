@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0 - 2026-06-25
+
+### Added
+
+- 增加全局 `--json` 输出，支持 `deploy`、`doctor`、`list`、`rollback`、`unlock` 等命令输出单行结构化结果，便于 CI/CD 解析。
+
 ## 0.4.0 - 2026-06-25
 
 ### Added

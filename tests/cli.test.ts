@@ -231,6 +231,104 @@ test('passes dry-run option to deploy handler and prints deploy plan', async () 
   assert.equal(stdout.includes('源路径: ./dist'), true);
 });
 
+test('prints command results as a single json object', async () => {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+
+  assert.equal(await runCli(['deploy', '--dry-run', '--json'], {
+    io: {
+      log: (message: string) => stdout.push(message),
+      error: (message: string) => stderr.push(message),
+    },
+    handlers: {
+      ...createFailingHandlers(),
+      deploy: async () => ({
+        dryRun: true as const,
+        mode: 'release' as const,
+        version: '20260625-180000',
+        sourcePath: './dist',
+        targetPath: '/var/www/site/releases/20260625-180000',
+        currentSymlink: '/var/www/site/current',
+      }),
+    },
+  }), 0);
+
+  assert.equal(stdout.length, 1);
+  assert.deepEqual(JSON.parse(stdout[0]), {
+    ok: true,
+    command: 'deploy',
+    result: {
+      dryRun: true,
+      mode: 'release',
+      version: '20260625-180000',
+      sourcePath: './dist',
+      targetPath: '/var/www/site/releases/20260625-180000',
+      currentSymlink: '/var/www/site/current',
+    },
+  });
+  assert.deepEqual(stderr, []);
+});
+
+test('prints non-zero command results as json without human text', async () => {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+
+  assert.equal(await runCli(['unlock', '--json'], {
+    io: {
+      log: (message: string) => stdout.push(message),
+      error: (message: string) => stderr.push(message),
+    },
+    handlers: {
+      ...createFailingHandlers(),
+      unlock: async () => ({
+        locked: true,
+        removed: false,
+        lockPath: '/var/www/site/.ssh-release.lock',
+        pid: '12345',
+      }),
+    },
+  }), 1);
+
+  assert.equal(stdout.length, 1);
+  assert.deepEqual(JSON.parse(stdout[0]), {
+    ok: false,
+    command: 'unlock',
+    result: {
+      locked: true,
+      removed: false,
+      lockPath: '/var/www/site/.ssh-release.lock',
+      pid: '12345',
+    },
+  });
+  assert.deepEqual(stderr, []);
+});
+
+test('prints command failures as json errors', async () => {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+
+  assert.equal(await runCli(['deploy', '--json'], {
+    io: {
+      log: (message: string) => stdout.push(message),
+      error: (message: string) => stderr.push(message),
+    },
+    handlers: {
+      ...createFailingHandlers(),
+      deploy: async () => {
+        throw new Error('deploy failed');
+      },
+    },
+  }), 1);
+
+  assert.equal(stdout.length, 1);
+  assert.deepEqual(JSON.parse(stdout[0]), {
+    ok: false,
+    command: 'deploy',
+    error: 'deploy failed',
+  });
+  assert.deepEqual(stderr, []);
+});
+
 function createFailingHandlers() {
   return {
     init: async () => {

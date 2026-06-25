@@ -54,17 +54,34 @@ export async function runCli(
   const parsed = parseCliArgs(argv);
 
   if (parsed.error) {
+    if (parsed.json) {
+      printJsonError(parsed.command, parsed.error, io);
+      return 1;
+    }
+
     io.error(parsed.error);
     return 1;
   }
 
   if (parsed.help) {
+    if (parsed.json) {
+      printJsonResult('help', { usage: createUsageText() }, 0, io);
+      return 0;
+    }
+
     printUsage(io);
     return 0;
   }
 
   if (parsed.version) {
-    io.log(readPackageVersion());
+    const version = readPackageVersion();
+
+    if (parsed.json) {
+      printJsonResult('version', { version }, 0, io);
+      return 0;
+    }
+
+    io.log(version);
     return 0;
   }
 
@@ -75,40 +92,96 @@ export async function runCli(
   try {
     if (command === 'init') {
       await handlers.init();
+
+      if (parsed.json) {
+        printJsonResult('init', { configPath: parsed.configPath }, 0, io);
+        return 0;
+      }
+
       io.log(`已创建 ${parsed.configPath}`);
       return 0;
     }
 
     if (command === 'deploy') {
-      printDeployResult(await handlers.deploy({ dryRun: parsed.dryRun }), io);
+      const result = await handlers.deploy({ dryRun: parsed.dryRun });
+
+      if (parsed.json) {
+        printJsonResult('deploy', result, 0, io);
+        return 0;
+      }
+
+      printDeployResult(result, io);
       return 0;
     }
 
     if (command === 'rollback') {
-      printRollbackResult(await handlers.rollback(args[0]), io);
+      const result = await handlers.rollback(args[0]);
+
+      if (parsed.json) {
+        printJsonResult('rollback', result, 0, io);
+        return 0;
+      }
+
+      printRollbackResult(result, io);
       return 0;
     }
 
     if (command === 'list') {
-      printListResult(await handlers.list(), io);
+      const result = await handlers.list();
+
+      if (parsed.json) {
+        printJsonResult('list', result, 0, io);
+        return 0;
+      }
+
+      printListResult(result, io);
       return 0;
     }
 
     if (command === 'doctor') {
       const report = await handlers.doctor();
+      const exitCode = report.ok ? 0 : 1;
+
+      if (parsed.json) {
+        printJsonResult('doctor', report, exitCode, io);
+        return exitCode;
+      }
+
       printDoctorReport(report, io);
-      return report.ok ? 0 : 1;
+      return exitCode;
     }
 
     if (command === 'unlock') {
       const result = await handlers.unlock({ confirmPath: parsed.confirmPath });
+      const exitCode = result.locked && !result.removed ? 1 : 0;
+
+      if (parsed.json) {
+        printJsonResult('unlock', result, exitCode, io);
+        return exitCode;
+      }
+
       printUnlockResult(result, io);
-      return result.locked && !result.removed ? 1 : 0;
+      return exitCode;
+    }
+
+    if (parsed.json) {
+      if (!command) {
+        printJsonResult('help', { usage: createUsageText() }, 0, io);
+        return 0;
+      }
+
+      printJsonError(command, `未知命令: ${command}`, io);
+      return 1;
     }
 
     printUsage(io);
     return command ? 1 : 0;
   } catch (error) {
+    if (parsed.json) {
+      printJsonError(command, formatError(error), io);
+      return 1;
+    }
+
     io.error(error instanceof Error ? error.message : String(error));
     return 1;
   }
@@ -122,6 +195,7 @@ interface ParsedCliArgs {
   dryRun: boolean;
   error?: string;
   help: boolean;
+  json: boolean;
   version: boolean;
 }
 
@@ -131,6 +205,7 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
   let configPath = CONFIG_FILE_NAME;
   let dryRun = false;
   let help = false;
+  let json = false;
   let version = false;
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -146,11 +221,16 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
       continue;
     }
 
+    if (arg === '--json') {
+      json = true;
+      continue;
+    }
+
     if (arg === '--config' || arg === '-c') {
       const value = argv[index + 1];
 
       if (!value || value.startsWith('-')) {
-        return createParsedError('--config 需要配置文件路径', configPath);
+        return createParsedError('--config 需要配置文件路径', configPath, json);
       }
 
       configPath = value;
@@ -167,7 +247,7 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
       const value = argv[index + 1];
 
       if (!value || value.startsWith('-')) {
-        return createParsedError('--confirm 需要远端锁路径', configPath);
+        return createParsedError('--confirm 需要远端锁路径', configPath, json);
       }
 
       confirmPath = value;
@@ -176,7 +256,7 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
     }
 
     if (arg.startsWith('-')) {
-      return createParsedError(`未知选项: ${arg}`, configPath);
+      return createParsedError(`未知选项: ${arg}`, configPath, json);
     }
 
     args.push(arg);
@@ -189,17 +269,19 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
     configPath,
     dryRun,
     help,
+    json,
     version,
   };
 }
 
-function createParsedError(error: string, configPath: string): ParsedCliArgs {
+function createParsedError(error: string, configPath: string, json = false): ParsedCliArgs {
   return {
     args: [],
     configPath,
     dryRun: false,
     error,
     help: false,
+    json,
     version: false,
   };
 }
@@ -320,6 +402,22 @@ function printUnlockResult(result: UnlockResult, io: CliIo): void {
   io.log(`ssh-release unlock --confirm ${result.lockPath}`);
 }
 
+function printJsonResult(command: string, result: unknown, exitCode: number, io: CliIo): void {
+  io.log(JSON.stringify({
+    ok: exitCode === 0,
+    command,
+    result,
+  }));
+}
+
+function printJsonError(command: string | undefined, error: string, io: CliIo): void {
+  io.log(JSON.stringify({
+    ok: false,
+    command,
+    error,
+  }));
+}
+
 function toRealPath(filePath: string): string {
   try {
     return realpathSync(filePath);
@@ -329,7 +427,11 @@ function toRealPath(filePath: string): string {
 }
 
 function printUsage(io: CliIo): void {
-  io.log(`用法:
+  io.log(createUsageText());
+}
+
+function createUsageText(): string {
+  return `用法:
   ssh-release init [--config <path>]
   ssh-release doctor [--config <path>]
   ssh-release deploy [--config <path>]
@@ -337,8 +439,9 @@ function printUsage(io: CliIo): void {
   ssh-release list [--config <path>]
   ssh-release rollback [version] [--config <path>]
   ssh-release unlock [--confirm <lock-path>] [--config <path>]
+  ssh-release <command> --json
   ssh-release --help
-  ssh-release --version`);
+  ssh-release --version`;
 }
 
 function readPackageVersion(): string {
@@ -347,6 +450,10 @@ function readPackageVersion(): string {
   ) as { version?: string };
 
   return packageJson.version ?? '0.0.0';
+}
+
+function formatError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 if (isCliEntrypoint(import.meta.url, process.argv[1])) {

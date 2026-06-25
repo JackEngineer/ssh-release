@@ -16,6 +16,7 @@
 - `ssh-release list`：查看远程版本和当前版本。
 - `ssh-release rollback [version]`：回滚到上一个版本或指定版本。
 - `ssh-release unlock`：查看远端锁，并在显式确认锁路径后删除锁。
+- `--json`：输出单行 JSON，便于 CI/CD 解析。
 - `release` 模式：上传压缩包、远端解压、切换 `current`、清理旧版本。
 - `overwrite` 模式：直接覆盖发布到目标目录。
 - 远端 `tar` 解压失败时回退逐文件上传。
@@ -224,6 +225,32 @@ ssh-release rollback 20260625-150000
 
 `overwrite` 模式没有版本列表，也不支持回滚。
 
+## JSON 输出
+
+需要在自动化脚本中解析结果时，可以给命令增加 `--json`：
+
+```bash
+ssh-release deploy --dry-run --json
+ssh-release doctor --json
+ssh-release list --json
+ssh-release rollback --json
+ssh-release unlock --json
+```
+
+成功时输出单行 JSON：
+
+```json
+{"ok":true,"command":"deploy","result":{"dryRun":true,"mode":"release"}}
+```
+
+命令执行失败时输出：
+
+```json
+{"ok":false,"command":"deploy","error":"错误信息"}
+```
+
+`doctor` 检查失败、`unlock` 发现锁但未删除时会返回非零退出码，并在 JSON 的 `result` 中保留检查结果。
+
 ## 安全边界
 
 配置模板不包含真实 IP、密码或生产路径。
@@ -363,6 +390,7 @@ docs/
 - 危险远程路径拒绝。
 - 发布模式和压缩格式校验。
 - CLI 命令分发。
+- CLI JSON 输出。
 - 本地 `.tgz` 打包和排除项。
 - macOS AppleDouble 元数据排除。
 - `release` 和 `overwrite` 发布流程。
