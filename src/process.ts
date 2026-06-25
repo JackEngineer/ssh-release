@@ -7,6 +7,7 @@ export interface ProcessResult {
 
 export interface RunProcessOptions {
   cwd?: string;
+  env?: NodeJS.ProcessEnv;
   allowFailure?: boolean;
 }
 
@@ -18,6 +19,10 @@ export async function runProcess(
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: options.cwd,
+      env: {
+        ...process.env,
+        ...options.env,
+      },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     const stdout: Buffer[] = [];

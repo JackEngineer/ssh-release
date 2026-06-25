@@ -27,20 +27,30 @@ export async function createReleasePackage(
     await runProcess('tar', [
       '-czf',
       archivePath,
+      '--no-xattrs',
       ...excludeArgs,
       '-C',
       options.sourcePath,
       '.',
-    ]);
+    ], {
+      env: {
+        COPYFILE_DISABLE: '1',
+      },
+    });
   } else {
     await runProcess('tar', [
       '-czf',
       archivePath,
+      '--no-xattrs',
       ...excludeArgs,
       '-C',
       path.dirname(options.sourcePath),
       path.basename(options.sourcePath),
-    ]);
+    ], {
+      env: {
+        COPYFILE_DISABLE: '1',
+      },
+    });
   }
 
   return {

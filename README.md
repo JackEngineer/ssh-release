@@ -197,6 +197,8 @@ export SSH_RELEASE_USER=deploy
 - `ssh`：执行远端目录、解压、软链接、列表和检查命令。
 - `scp`：上传压缩包和逐文件回退上传。
 
+在 macOS 上打包时会禁用 AppleDouble 和扩展属性元数据，避免把 `._*` 文件发布到 Linux 服务器。
+
 远端 `tar` 是可选能力，不可用时会按配置回退逐文件上传。
 
 ## 开发命令
@@ -257,6 +259,7 @@ docs/
 - 发布模式和压缩格式校验。
 - CLI 命令分发。
 - 本地 `.tgz` 打包和排除项。
+- macOS AppleDouble 元数据排除。
 - `release` 和 `overwrite` 发布流程。
 - 远端 `tar` 失败后的逐文件上传回退。
 - 远程版本列表读取和当前版本标记。
