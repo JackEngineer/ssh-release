@@ -6,26 +6,19 @@
 
 ## 当前状态
 
-当前仓库处于早期实现阶段。
+当前仓库已完成第一版 MVP。
 
 已实现：
 
 - `ssh-release init`：生成 `ssh-release.config.ts` 配置模板。
-- 配置模板生成。
-- 配置字段归一化和校验。
-- 危险远程路径拦截。
-- 版本号生成。
-- 旧版本保留计算。
-- 回滚目标选择。
-
-已预留但尚未实现：
-
-- `ssh-release deploy`
-- `ssh-release rollback [version]`
-- `ssh-release list`
-- `ssh-release doctor`
-
-执行这些预留命令时，CLI 当前会返回“命令尚未实现”。
+- `ssh-release doctor`：检查配置、本地源路径、SSH 连接、远程目录和远端 `tar`。
+- `ssh-release deploy`：发布本地文件或目录。
+- `ssh-release list`：查看远程版本和当前版本。
+- `ssh-release rollback [version]`：回滚到上一个版本或指定版本。
+- `release` 模式：上传压缩包、远端解压、切换 `current`、清理旧版本。
+- `overwrite` 模式：直接覆盖发布到目标目录。
+- 远端 `tar` 解压失败时回退逐文件上传。
+- 配置字段归一化、危险远程路径拦截、版本号生成、旧版本保留计算和回滚目标选择。
 
 ## 安装依赖
 
@@ -37,6 +30,10 @@ npm install
 
 ```bash
 npm run dev -- init
+npm run dev -- doctor
+npm run dev -- deploy
+npm run dev -- list
+npm run dev -- rollback
 ```
 
 构建 CLI：
@@ -66,6 +63,8 @@ npm run dev -- init
 ```
 
 生成的配置文件名为 `ssh-release.config.ts`。
+
+配置文件应使用 `export default` 导出配置对象。当前模板支持从环境变量读取服务器地址和用户名：
 
 示例配置：
 
@@ -126,7 +125,45 @@ source files -> package -> upload -> release -> activate -> rollback
 - 回滚只切换 `current`，不删除版本目录。
 - 清理旧版本时保留当前版本。
 
-`overwrite` 模式用于不需要版本管理的目录，后续实现后会直接发布到 `target.path`，不创建 `current` 和 `releases`。
+`overwrite` 模式用于不需要版本管理的目录，会直接发布到 `target.path`，不创建 `current` 和 `releases`。
+
+## 发布命令
+
+发布前先检查配置和远端环境：
+
+```bash
+ssh-release doctor
+```
+
+执行发布：
+
+```bash
+ssh-release deploy
+```
+
+`release` 模式发布成功后会输出版本号、版本目录和 `current` 软链接路径。只有压缩包上传和解压完成后才切换 `current`。
+
+远端 `tar` 不可用或解压失败时，如果 `deploy.fallbackToFileUpload` 为 `true`，工具会回退逐文件上传。`release` 模式只清理失败的新版本目录；`overwrite` 模式不会先删除整个目标目录。
+
+查看版本：
+
+```bash
+ssh-release list
+```
+
+回滚到上一个版本：
+
+```bash
+ssh-release rollback
+```
+
+回滚到指定版本：
+
+```bash
+ssh-release rollback 20260625-150000
+```
+
+`overwrite` 模式没有版本列表，也不支持回滚。
 
 ## 安全边界
 
@@ -152,6 +189,16 @@ export SSH_RELEASE_USER=deploy
 
 这些路径下的子目录可以使用，例如 `/var/www/my-app`。
 
+`target.currentSymlink`、`target.releasesDir` 和 `target.tempDir` 必须是简单相对名称，不能包含 `/`、`\`，也不能等于 `.` 或 `..`。
+
+本地需要可用的系统命令：
+
+- `tar`：本地打包发布内容。
+- `ssh`：执行远端目录、解压、软链接、列表和检查命令。
+- `scp`：上传压缩包和逐文件回退上传。
+
+远端 `tar` 是可选能力，不可用时会按配置回退逐文件上传。
+
 ## 开发命令
 
 ```bash
@@ -172,15 +219,27 @@ npm run build
 src/
 ├── cli.ts
 ├── config.ts
+├── doctor.ts
+├── list.ts
+├── package.ts
+├── process.ts
+├── remote.ts
 ├── release.ts
 ├── rollback.ts
+├── ssh.ts
 ├── types.ts
 └── validate.ts
 
 tests/
+├── cli.test.ts
+├── config-load.test.ts
 ├── config-template.test.ts
+├── deploy.test.ts
+├── list-doctor.test.ts
+├── package.test.ts
 ├── release.test.ts
 ├── rollback.test.ts
+├── ssh.test.ts
 └── validate.test.ts
 
 docs/
@@ -192,9 +251,16 @@ docs/
 当前测试覆盖：
 
 - 配置模板不泄露真实主机、密码和 IP。
+- 配置文件加载和 `~` 路径展开。
 - 配置默认值填充。
 - 危险远程路径拒绝。
 - 发布模式和压缩格式校验。
+- CLI 命令分发。
+- 本地 `.tgz` 打包和排除项。
+- `release` 和 `overwrite` 发布流程。
+- 远端 `tar` 失败后的逐文件上传回退。
+- 远程版本列表读取和当前版本标记。
+- `doctor` 检查结果。
 - 时间戳版本名生成。
 - 旧版本清理选择。
 - 回滚目标选择。

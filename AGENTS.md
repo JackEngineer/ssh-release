@@ -4,11 +4,12 @@
 
 本仓库用于开发 `ssh-release`，一个通用 SSH 文件发布 CLI。当前设计文档位于 `docs/superpowers/specs/2026-06-25-ssh-release-design.md`。
 
-开始实现后，建议按职责拆分源码：
+源码按职责拆分：
 
 - `src/cli.ts`：命令入口与参数解析。
-- `src/config.ts`、`src/validate.ts`、`src/output.ts`：配置、校验和输出。
-- `src/ssh.ts`、`src/package.ts`、`src/upload.ts`、`src/release.ts`、`src/rollback.ts`、`src/list.ts`、`src/doctor.ts`：发布流程模块。
+- `src/config.ts`、`src/validate.ts`：配置加载、归一化和校验。
+- `src/ssh.ts`、`src/package.ts`、`src/remote.ts`、`src/process.ts`：SSH、打包、远端命令和本地进程封装。
+- `src/release.ts`、`src/rollback.ts`、`src/list.ts`、`src/doctor.ts`：发布、回滚、列表和检查流程模块。
 - `tests/`：单元测试和集成测试。
 - `docs/`：设计说明和贡献文档。
 

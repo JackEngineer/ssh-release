@@ -64,6 +64,10 @@ export function normalizeConfig(input: SshReleaseConfigInput): SshReleaseConfig 
     throw new Error('source.exclude 必须是字符串数组');
   }
 
+  if (exclude.some((entry) => typeof entry !== 'string')) {
+    throw new Error('source.exclude 必须是字符串数组');
+  }
+
   return {
     source: {
       path: requiredString(input.source?.path, 'source.path'),
@@ -77,9 +81,9 @@ export function normalizeConfig(input: SshReleaseConfigInput): SshReleaseConfig 
     },
     target: {
       path: validateTargetPath(requiredString(input.target?.path, 'target.path')),
-      currentSymlink: input.target?.currentSymlink ?? 'current',
-      releasesDir: input.target?.releasesDir ?? 'releases',
-      tempDir: input.target?.tempDir ?? '.ssh-release-tmp',
+      currentSymlink: validateTargetName(input.target?.currentSymlink ?? 'current', 'target.currentSymlink'),
+      releasesDir: validateTargetName(input.target?.releasesDir ?? 'releases', 'target.releasesDir'),
+      tempDir: validateTargetName(input.target?.tempDir ?? '.ssh-release-tmp', 'target.tempDir'),
     },
     deploy: {
       mode: mode as DeployMode,
@@ -97,4 +101,19 @@ function requiredString(value: string | undefined, fieldName: string): string {
   }
 
   return value.trim();
+}
+
+function validateTargetName(value: string, fieldName: string): string {
+  const normalizedValue = requiredString(value, fieldName);
+
+  if (
+    normalizedValue === '.' ||
+    normalizedValue === '..' ||
+    normalizedValue.includes('/') ||
+    normalizedValue.includes('\\')
+  ) {
+    throw new Error(`${fieldName} 必须是简单相对名称`);
+  }
+
+  return normalizedValue;
 }

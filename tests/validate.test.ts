@@ -71,3 +71,40 @@ test('rejects invalid deploy mode and compression', () => {
     /deploy.compression/,
   );
 });
+
+test('rejects non-string source exclude entries', () => {
+  assert.throws(
+    () => normalizeConfig({
+      ...baseConfig,
+      source: {
+        path: './dist',
+        exclude: ['node_modules', 123] as unknown as string[],
+      },
+    }),
+    /source.exclude/,
+  );
+});
+
+test('rejects target helper names that escape the target directory', () => {
+  assert.throws(
+    () => normalizeConfig({
+      ...baseConfig,
+      target: {
+        path: '/var/www/my-app',
+        currentSymlink: '../current',
+      },
+    }),
+    /target.currentSymlink/,
+  );
+
+  assert.throws(
+    () => normalizeConfig({
+      ...baseConfig,
+      target: {
+        path: '/var/www/my-app',
+        releasesDir: 'release/history',
+      },
+    }),
+    /target.releasesDir/,
+  );
+});
