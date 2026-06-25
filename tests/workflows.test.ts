@@ -7,6 +7,10 @@ test('publishes npm packages through trusted publishing without long-lived token
     new URL('../.github/workflows/publish.yml', import.meta.url),
     'utf8',
   );
+  const ciWorkflow = await readFile(
+    new URL('../.github/workflows/ci.yml', import.meta.url),
+    'utf8',
+  );
   const checklist = await readFile(
     new URL('../docs/release-checklist.md', import.meta.url),
     'utf8',
@@ -14,6 +18,7 @@ test('publishes npm packages through trusted publishing without long-lived token
   const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');
 
   assert.match(workflow, /tags:\n\s+- 'v\*'/);
+  assert.match(workflow, /TZ: Asia\/Shanghai/);
   assert.match(workflow, /id-token: write/);
   assert.match(workflow, /contents: read/);
   assert.match(workflow, /actions\/setup-node@v6/);
@@ -25,6 +30,7 @@ test('publishes npm packages through trusted publishing without long-lived token
   assert.match(workflow, /npm publish --dry-run/);
   assert.match(workflow, /npm publish/);
   assert.doesNotMatch(workflow, /NODE_AUTH_TOKEN|NPM_TOKEN|secrets\./);
+  assert.match(ciWorkflow, /TZ: Asia\/Shanghai/);
 
   assert.match(checklist, /Trusted Publisher/);
   assert.match(checklist, /workflow 文件为 `publish\.yml`/);

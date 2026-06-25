@@ -6,6 +6,9 @@ on:
     branches:
       - main
 
+env:
+  TZ: Asia/Shanghai
+
 jobs:
   test:
     runs-on: ubuntu-latest
