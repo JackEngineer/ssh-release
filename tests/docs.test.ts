@@ -29,6 +29,7 @@ test('documents recovery steps for common deployment failures', async () => {
   assert.match(guide, /current/);
   assert.match(guide, /rollback/);
   assert.match(guide, /verified/);
+  assert.match(guide, /下一步/);
   assert.match(guide, /tar/);
   assert.match(guide, /--json --progress/);
   assert.doesNotMatch(guide, new RegExp([
@@ -48,6 +49,7 @@ test('documents stable CLI, JSON, config, and safety contracts for 1.0', async (
   assert.match(guide, /ssh-release deploy --plan/);
   assert.match(guide, /ssh-release rollback \[version\] --plan/);
   assert.match(guide, /"ok": true/);
+  assert.match(guide, /"hint"/);
   assert.match(guide, /"verified": true/);
   assert.match(guide, /manifest\.json/);
   assert.match(guide, /SHA-256/);

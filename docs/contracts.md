@@ -50,6 +50,12 @@
 {"ok": false, "command": "deploy", "error": "错误信息"}
 ```
 
+如果错误属于常见可恢复场景，失败结果还会包含 `hint`：
+
+```json
+{"ok": false, "command": "rollback", "error": "回滚目标不存在: 20260625-090000", "hint": "先运行 ssh-release list 查看当前版本和可用版本，再选择存在的版本回滚。"}
+```
+
 非零命令结果，例如发现锁但未删除：
 
 ```json

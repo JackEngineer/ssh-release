@@ -621,6 +621,58 @@ test('prints command failures as json errors', async () => {
   assert.deepEqual(stderr, []);
 });
 
+test('prints an actionable next step for remote lock failures', async () => {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+
+  assert.equal(await runCli(['deploy'], {
+    io: {
+      log: (message: string) => stdout.push(message),
+      error: (message: string) => stderr.push(message),
+    },
+    handlers: {
+      ...createFailingHandlers(),
+      deploy: async () => {
+        throw new Error('远程已有发布任务正在运行，请确认后删除 /var/www/site/.ssh-release.lock');
+      },
+    },
+  }), 1);
+
+  assert.deepEqual(stdout, []);
+  assert.equal(stderr.includes('远程已有发布任务正在运行，请确认后删除 /var/www/site/.ssh-release.lock'), true);
+  assert.equal(
+    stderr.includes('下一步: 先运行 ssh-release unlock 查看远端锁，确认没有发布或回滚任务后再按提示删除锁。'),
+    true,
+  );
+});
+
+test('prints rollback failure hints in json errors', async () => {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+
+  assert.equal(await runCli(['rollback', '20260625-090000', '--json'], {
+    io: {
+      log: (message: string) => stdout.push(message),
+      error: (message: string) => stderr.push(message),
+    },
+    handlers: {
+      ...createFailingHandlers(),
+      rollback: async () => {
+        throw new Error('回滚目标不存在: 20260625-090000');
+      },
+    },
+  }), 1);
+
+  assert.equal(stdout.length, 1);
+  assert.deepEqual(JSON.parse(stdout[0]), {
+    ok: false,
+    command: 'rollback',
+    error: '回滚目标不存在: 20260625-090000',
+    hint: '先运行 ssh-release list 查看当前版本和可用版本，再选择存在的版本回滚。',
+  });
+  assert.deepEqual(stderr, []);
+});
+
 test('prints deploy progress as ndjson before the final json result', async () => {
   const stdout: string[] = [];
 

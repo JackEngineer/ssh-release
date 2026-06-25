@@ -196,12 +196,20 @@ export async function runCli(
     printUsage(io);
     return command ? 1 : 0;
   } catch (error) {
+    const errorMessage = formatError(error);
+    const hint = createErrorHint(command, errorMessage);
+
     if (parsed.json) {
-      printJsonError(command, formatError(error), io);
+      printJsonError(command, errorMessage, io, hint);
       return 1;
     }
 
-    io.error(error instanceof Error ? error.message : String(error));
+    io.error(errorMessage);
+
+    if (hint) {
+      io.error(`下一步: ${hint}`);
+    }
+
     return 1;
   }
 }
@@ -502,12 +510,28 @@ function printJsonProgress(command: string, event: DeployProgressEvent, io: CliI
   }));
 }
 
-function printJsonError(command: string | undefined, error: string, io: CliIo): void {
-  io.log(JSON.stringify({
+function printJsonError(
+  command: string | undefined,
+  error: string,
+  io: CliIo,
+  hint?: string,
+): void {
+  const payload: {
+    ok: false;
+    command: string | undefined;
+    error: string;
+    hint?: string;
+  } = {
     ok: false,
     command,
     error,
-  }));
+  };
+
+  if (hint) {
+    payload.hint = hint;
+  }
+
+  io.log(JSON.stringify(payload));
 }
 
 function toRealPath(filePath: string): string {
@@ -550,6 +574,52 @@ function readPackageVersion(): string {
 
 function formatError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function createErrorHint(command: string | undefined, error: string): string | undefined {
+  if (error.includes('远程已有发布任务正在运行') || error.includes('.ssh-release.lock')) {
+    return '先运行 ssh-release unlock 查看远端锁，确认没有发布或回滚任务后再按提示删除锁。';
+  }
+
+  if (command === 'rollback') {
+    if (
+      error.includes('回滚目标不存在')
+      || error.includes('没有可回滚版本')
+      || error.includes('当前版本不存在')
+    ) {
+      return '先运行 ssh-release list 查看当前版本和可用版本，再选择存在的版本回滚。';
+    }
+
+    if (error.includes('overwrite 模式不支持回滚')) {
+      return 'overwrite 模式没有版本目录；需要恢复内容时请重新发布正确的本地文件。';
+    }
+  }
+
+  if (command === 'deploy' && (
+    error.includes('current 未指向新版本')
+    || error.includes('版本目录校验失败')
+    || error.includes('目标目录校验失败')
+    || error.includes('发布锁未清理')
+    || error.includes('manifest.json hash')
+  )) {
+    return '先运行 ssh-release list --json 和 ssh-release doctor --json，确认 current、版本目录、manifest 和远端锁状态。';
+  }
+
+  if (
+    command
+    && command !== 'init'
+    && (
+      error.includes('Permission denied')
+      || error.includes('Connection timed out')
+      || error.includes('Could not resolve hostname')
+      || error.includes('sshpass')
+      || error.includes('SSH')
+    )
+  ) {
+    return '先运行 ssh-release doctor 检查 SSH 连接、认证信息和远端目录权限。';
+  }
+
+  return undefined;
 }
 
 if (isCliEntrypoint(import.meta.url, process.argv[1])) {
