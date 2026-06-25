@@ -11,7 +11,8 @@
 - `package.json` 的 `files` 只包含 npm 包需要发布的文件。
 - `package.json` 的 `bin.ssh-release` 指向 `dist/cli.js`。
 - 当前 npm 包名可用，或当前账号有对应包的发布权限。
-- 当前 npm 账号已登录，并且 registry 指向 `https://registry.npmjs.org/`。
+- npm 包已配置 Trusted Publisher，发布方为 GitHub Actions，仓库为 `JackEngineer/ssh-release`，workflow 文件为 `publish.yml`。
+- 不再使用长期 npm 发布 token；不要在 GitHub Secrets 中配置 `NPM_TOKEN` 用于发布。
 
 ## 本地门禁
 
@@ -73,13 +74,7 @@ npm view ssh-release name version --json
 
 首次发布时，如果 registry 返回 `E404 Not Found`，表示当前查询时包名尚未被占用。
 
-检查当前 npm 登录账号：
-
-```bash
-npm whoami --registry=https://registry.npmjs.org/
-```
-
-如果返回 `E401 Unauthorized`，先执行 `npm login`，再重新检查。
+正式发布由 GitHub Actions 通过 npm Trusted Publishing 完成。该发布流程使用 OIDC 短期身份，不依赖本机 npm 登录状态，也不需要 `NPM_TOKEN`。
 
 ## Git 发布步骤
 
@@ -104,15 +99,16 @@ git tag -a "v$VERSION" -m "v$VERSION"
 git push origin "v$VERSION"
 ```
 
-标签只应在确认版本号、提交范围和发布权限后创建。
+标签只应在确认版本号、提交范围和发布权限后创建。推送 `v*` 标签会触发 `.github/workflows/publish.yml`，workflow 会先校验标签版本和 `package.json` 版本一致，再执行 npm 发布。
 
-## 正式 npm 发布
+## 自动 npm 发布
 
-确认 npm 登录、包名权限、dry-run 和本地烟测都通过后执行：
+发布 workflow 必须满足：
 
-```bash
-npm publish
-```
+- `permissions.id-token` 为 `write`，让 npm 通过 GitHub Actions OIDC 验证发布身份。
+- `actions/setup-node` 配置 `registry-url: https://registry.npmjs.org`。
+- 发布 job 使用 GitHub 托管 runner，不使用 self-hosted runner。
+- 发布命令为 `npm publish`，不设置 `NODE_AUTH_TOKEN`、`NPM_TOKEN` 或其他长期发布 token。
 
 发布完成后验证：
 

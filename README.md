@@ -338,6 +338,7 @@ npm run build
 - `npm test`：运行 Node.js 测试。
 - `npm run build`：编译 `dist/`。
 - GitHub Actions 会在 `main` 推送和 Pull Request 上运行 `npm ci`、`lint`、`test` 和 `build`。
+- 推送 `v*` 标签会触发 npm 自动发布 workflow。发布使用 npm Trusted Publishing，不需要长期 `NPM_TOKEN`。
 
 ## 发布前检查
 
@@ -360,6 +361,7 @@ npm install -g "$PACK_DIR"/ssh-release-"$VERSION".tgz --prefix "$PACK_DIR/prefix
 ```
 
 `npm publish` 会发布到 npm registry，只有确认版本号、包内容、登录账号和发布权限都正确后再执行。
+当前仓库正式发布由 `.github/workflows/publish.yml` 执行：推送版本标签后，GitHub Actions 会校验标签版本、运行发布门禁、检查包内容并调用 `npm publish`。
 
 完整发布步骤见 [docs/release-checklist.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/release-checklist.md)。
 
@@ -374,7 +376,9 @@ GitHub Actions 发布模板见 [docs/github-actions.md](https://github.com/JackE
 ```text
 CHANGELOG.md
 .github/
-└── workflows/ci.yml
+└── workflows/
+    ├── ci.yml
+    └── publish.yml
 src/
 ├── cli.ts
 ├── config.ts
