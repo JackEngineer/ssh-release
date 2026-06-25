@@ -365,6 +365,8 @@ npm install -g "$PACK_DIR"/ssh-release-"$VERSION".tgz --prefix "$PACK_DIR/prefix
 
 GitHub Actions 发布模板见 [docs/github-actions.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/github-actions.md)。
 
+失败恢复指南见 [docs/recovery.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/recovery.md)。
+
 版本变更见 [CHANGELOG.md](https://github.com/JackEngineer/ssh-release/blob/main/CHANGELOG.md)。
 
 ## 项目结构
@@ -406,6 +408,7 @@ tests/
 
 docs/
 ├── github-actions.md
+├── recovery.md
 ├── release-checklist.md
 └── superpowers/specs/2026-06-25-ssh-release-design.md
 ```

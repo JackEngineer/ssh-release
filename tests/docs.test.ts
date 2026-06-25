@@ -19,3 +19,22 @@ test('documents a GitHub Actions deployment workflow with safe secrets usage', a
   ].join('|')));
   assert.match(readme, /docs\/github-actions\.md/);
 });
+
+test('documents recovery steps for common deployment failures', async () => {
+  const guide = await readFile(new URL('../docs/recovery.md', import.meta.url), 'utf8');
+  const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');
+
+  assert.match(guide, /远端锁/);
+  assert.match(guide, /ssh-release unlock --confirm/);
+  assert.match(guide, /current/);
+  assert.match(guide, /rollback/);
+  assert.match(guide, /verified/);
+  assert.match(guide, /tar/);
+  assert.match(guide, /--json --progress/);
+  assert.doesNotMatch(guide, new RegExp([
+    ['47', '114', '97', '21'].join('\\.'),
+    ['xiao', 'mao', '1994'].join(''),
+    'npm_[A-Za-z0-9]{20,}',
+  ].join('|')));
+  assert.match(readme, /docs\/recovery\.md/);
+});
