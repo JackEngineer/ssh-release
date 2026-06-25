@@ -372,6 +372,39 @@ test('prints deploy progress as ndjson before the final json result', async () =
   assert.equal(JSON.parse(stdout[2]).result.version, '20260625-180000');
 });
 
+test('prints remote verification status after deploy succeeds', async () => {
+  const stdout: string[] = [];
+
+  assert.equal(await runCli(['deploy'], {
+    io: {
+      log: (message: string) => stdout.push(message),
+      error: () => undefined,
+    },
+    handlers: {
+      ...createFailingHandlers(),
+      deploy: async () => ({
+        mode: 'release' as const,
+        version: '20260625-180000',
+        targetPath: '/var/www/site/releases/20260625-180000',
+        currentSymlink: '/var/www/site/current',
+        usedFallback: false,
+        verified: true,
+        verification: [
+          {
+            name: '当前版本',
+            status: 'pass' as const,
+            message: 'current 已指向新版本',
+          },
+        ],
+        warnings: [],
+      }),
+    },
+  }), 0);
+
+  assert.equal(stdout.includes('远端校验通过'), true);
+  assert.equal(stdout.includes('校验: 当前版本 - current 已指向新版本'), true);
+});
+
 function createFailingHandlers() {
   return {
     init: async () => {

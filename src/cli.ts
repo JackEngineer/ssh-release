@@ -381,6 +381,14 @@ function printDeployResult(result: DeployResult | DeployPlan, io: CliIo): void {
     io.log('远端 tar 不可用或解压失败，已使用逐文件上传');
   }
 
+  if (result.verified) {
+    io.log('远端校验通过');
+
+    for (const check of result.verification ?? []) {
+      io.log(`校验: ${check.name} - ${check.message}`);
+    }
+  }
+
   for (const warning of result.warnings) {
     io.log(`警告: ${warning}`);
   }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0 - 2026-06-25
+
+### Added
+
+- 增加发布后远端状态校验，`deploy` 成功后会确认目标目录、`current` 指向和远端锁清理状态，并在结果中输出 `verified` 与 `verification`。
+
 ## 0.6.0 - 2026-06-25
 
 ### Added

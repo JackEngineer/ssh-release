@@ -5,7 +5,7 @@ import {
   type CreateReleasePackageOptions,
   type ReleasePackage,
 } from './package.js';
-import { acquireRemoteLock } from './lock.js';
+import { acquireRemoteLock, readRemoteLockStatus } from './lock.js';
 import {
   readRemoteReleaseNames,
   remoteJoin,
@@ -20,6 +20,8 @@ export interface DeployResult {
   targetPath: string;
   currentSymlink?: string;
   usedFallback: boolean;
+  verified?: boolean;
+  verification?: DeployVerificationCheck[];
   warnings: string[];
 }
 
@@ -40,6 +42,12 @@ export interface DeployProgressEvent {
   stage: DeployProgressStage;
   status: DeployProgressStatus;
   error?: string;
+}
+
+export interface DeployVerificationCheck {
+  name: string;
+  status: 'pass';
+  message: string;
 }
 
 export interface DeployOptions {
@@ -143,6 +151,11 @@ export async function deploy(
         } else if (!deployError && !cleanupError) {
           cleanupError = error;
         }
+      }
+
+      if (result && !deployError && !cleanupError) {
+        result.verification = await verifyDeployResult(config, client, result);
+        result.verified = true;
       }
 
       if (cleanupError && !deployError) {
@@ -313,6 +326,90 @@ async function cleanupOldReleases(
   } catch (error) {
     warnings.push(`旧版本清理失败: ${formatError(error)}`);
   }
+}
+
+async function verifyDeployResult(
+  config: SshReleaseConfig,
+  client: RemoteClient,
+  result: DeployResult,
+): Promise<DeployVerificationCheck[]> {
+  if (result.mode === 'overwrite') {
+    return [
+      await verifyRemoteDirectory(client, result.targetPath, '目标目录', '远端目标目录存在'),
+      await verifyRemoteLockReleased(config, client),
+    ];
+  }
+
+  if (!result.version || !result.currentSymlink) {
+    throw new Error('release 发布结果缺少版本号或 current 路径，无法校验远端状态');
+  }
+
+  return [
+    await verifyRemoteDirectory(client, result.targetPath, '版本目录', '远端版本目录存在'),
+    await verifyCurrentSymlink(client, result.currentSymlink, remoteJoin(config.target.releasesDir, result.version)),
+    await verifyRemoteLockReleased(config, client),
+  ];
+}
+
+async function verifyRemoteDirectory(
+  client: RemoteClient,
+  remotePath: string,
+  name: string,
+  successMessage: string,
+): Promise<DeployVerificationCheck> {
+  try {
+    await client.exec(`test -d ${shellQuote(remotePath)}`);
+  } catch (error) {
+    throw new Error(`${name}校验失败: ${formatError(error)}`);
+  }
+
+  return {
+    name,
+    status: 'pass',
+    message: successMessage,
+  };
+}
+
+async function verifyCurrentSymlink(
+  client: RemoteClient,
+  currentSymlinkPath: string,
+  expectedTarget: string,
+): Promise<DeployVerificationCheck> {
+  let actualTarget: string;
+
+  try {
+    const result = await client.exec(`readlink ${shellQuote(currentSymlinkPath)}`);
+    actualTarget = result.stdout.trim();
+  } catch (error) {
+    throw new Error(`current 校验失败: ${formatError(error)}`);
+  }
+
+  if (actualTarget !== expectedTarget) {
+    throw new Error(`current 未指向新版本: 期望 ${expectedTarget}，实际 ${actualTarget || '空'}`);
+  }
+
+  return {
+    name: '当前版本',
+    status: 'pass',
+    message: 'current 已指向新版本',
+  };
+}
+
+async function verifyRemoteLockReleased(
+  config: SshReleaseConfig,
+  client: RemoteClient,
+): Promise<DeployVerificationCheck> {
+  const lockStatus = await readRemoteLockStatus(config, client);
+
+  if (lockStatus.locked) {
+    throw new Error(`发布锁未清理: ${lockStatus.lockPath}`);
+  }
+
+  return {
+    name: '远端锁',
+    status: 'pass',
+    message: '发布锁已清理',
+  };
 }
 
 async function ensureSourceExists(sourcePath: string): Promise<void> {

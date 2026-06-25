@@ -18,6 +18,7 @@
 - `ssh-release unlock`：查看远端锁，并在显式确认锁路径后删除锁。
 - `--json`：输出单行 JSON，便于 CI/CD 解析。
 - `deploy --json --progress`：发布时输出 NDJSON 阶段进度，便于 CI/CD 展示实时状态。
+- 发布后远端校验：确认版本目录或目标目录存在、`current` 已指向新版本、远端锁已清理。
 - `release` 模式：上传压缩包、远端解压、切换 `current`、清理旧版本。
 - `overwrite` 模式：直接覆盖发布到目标目录。
 - 远端 `tar` 解压失败时回退逐文件上传。
@@ -188,6 +189,8 @@ ssh-release deploy
 
 `release` 模式发布成功后会输出版本号、版本目录和 `current` 软链接路径。只有压缩包上传和解压完成后才切换 `current`。
 
+发布命令返回成功前会执行远端状态校验。`release` 模式会确认新版本目录存在、`current` 已指向新版本、远端锁已清理；`overwrite` 模式会确认目标目录存在、远端锁已清理。校验失败时发布命令返回失败，不会把结果标记为成功。
+
 如果远端已有 `.ssh-release.lock`，说明同一目标目录可能正在发布或回滚，工具会停止在修改远端状态之前。
 
 查看锁状态：
@@ -242,7 +245,7 @@ ssh-release unlock --json
 成功时输出单行 JSON：
 
 ```json
-{"ok":true,"command":"deploy","result":{"dryRun":true,"mode":"release"}}
+{"ok":true,"command":"deploy","result":{"mode":"release","version":"20260625-153000","verified":true}}
 ```
 
 命令执行失败时输出：
@@ -262,10 +265,16 @@ ssh-release deploy --json --progress
 ```json
 {"ok":true,"command":"deploy","event":"progress","stage":"package","status":"start"}
 {"ok":true,"command":"deploy","event":"progress","stage":"package","status":"success"}
-{"ok":true,"command":"deploy","result":{"mode":"release","version":"20260625-153000"}}
+{"ok":true,"command":"deploy","result":{"mode":"release","version":"20260625-153000","verified":true}}
 ```
 
 `stage` 可能是 `source`、`lock`、`package`、`publish`、`cleanup`，`status` 可能是 `start`、`success`、`fail`。失败事件会包含 `error` 字段。
+
+发布结果中的 `verification` 会列出已通过的远端校验项：
+
+```json
+{"verified":true,"verification":[{"name":"当前版本","status":"pass","message":"current 已指向新版本"}]}
+```
 
 `doctor` 检查失败、`unlock` 发现锁但未删除时会返回非零退出码，并在 JSON 的 `result` 中保留检查结果。
 
