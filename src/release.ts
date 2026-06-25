@@ -22,6 +22,15 @@ export interface DeployResult {
   warnings: string[];
 }
 
+export interface DeployPlan {
+  dryRun: true;
+  mode: 'release' | 'overwrite';
+  version?: string;
+  sourcePath: string;
+  targetPath: string;
+  currentSymlink?: string;
+}
+
 export interface DeployOptions {
   now?: Date;
   createPackage?: (options: CreateReleasePackageOptions) => Promise<ReleasePackage>;
@@ -86,6 +95,34 @@ export async function deploy(
   } finally {
     await releasePackage.cleanup();
   }
+}
+
+export async function createDeployPlan(
+  config: SshReleaseConfig,
+  options: Pick<DeployOptions, 'now'> = {},
+): Promise<DeployPlan> {
+  await ensureSourceExists(config.source.path);
+
+  if (config.deploy.mode === 'overwrite') {
+    return {
+      dryRun: true,
+      mode: 'overwrite',
+      sourcePath: config.source.path,
+      targetPath: config.target.path,
+    };
+  }
+
+  const versionName = createVersionName(options.now ?? new Date());
+  const releasesPath = remoteJoin(config.target.path, config.target.releasesDir);
+
+  return {
+    dryRun: true,
+    mode: 'release',
+    version: versionName,
+    sourcePath: config.source.path,
+    targetPath: remoteJoin(releasesPath, versionName),
+    currentSymlink: remoteJoin(config.target.path, config.target.currentSymlink),
+  };
 }
 
 async function deployRelease(

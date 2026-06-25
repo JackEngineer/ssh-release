@@ -40,6 +40,13 @@ npm install -g ssh-release
 ssh-release init
 ```
 
+查看帮助和版本：
+
+```bash
+ssh-release --help
+ssh-release --version
+```
+
 ## 本地开发
 
 ```bash
@@ -77,6 +84,14 @@ npm run dev -- init
 ```
 
 生成的配置文件名为 `ssh-release.config.ts`。
+
+需要使用自定义配置路径时，可以传入 `--config`：
+
+```bash
+ssh-release init --config deploy.config.ts
+ssh-release doctor --config deploy.config.ts
+ssh-release deploy --config deploy.config.ts
+```
 
 配置文件应使用 `export default` 导出配置对象。当前模板支持从环境变量读取服务器地址和用户名：
 
@@ -148,6 +163,12 @@ source files -> package -> upload -> release -> activate -> rollback
 
 ```bash
 ssh-release doctor
+```
+
+需要先查看发布计划但不修改服务器时：
+
+```bash
+ssh-release deploy --dry-run
 ```
 
 执行发布：
@@ -239,6 +260,7 @@ npm run build
 - `npm run lint`：运行 TypeScript 静态检查。
 - `npm test`：运行 Node.js 测试。
 - `npm run build`：编译 `dist/`。
+- GitHub Actions 会在 `main` 推送和 Pull Request 上运行 `npm ci`、`lint`、`test` 和 `build`。
 
 ## 发布前检查
 
@@ -270,6 +292,8 @@ npm install -g "$PACK_DIR"/ssh-release-"$VERSION".tgz --prefix "$PACK_DIR/prefix
 
 ```text
 CHANGELOG.md
+.github/
+└── workflows/ci.yml
 src/
 ├── cli.ts
 ├── config.ts
