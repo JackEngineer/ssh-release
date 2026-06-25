@@ -36,6 +36,7 @@ test('publishes npm packages through trusted publishing without long-lived token
   assert.match(workflow, /ssh-release --version --json/);
   assert.doesNotMatch(workflow, /NODE_AUTH_TOKEN|NPM_TOKEN|secrets\./);
   assert.match(ciWorkflow, /TZ: Asia\/Shanghai/);
+  assert.match(ciWorkflow, /workflow_dispatch:/);
 
   assert.match(checklist, /Trusted Publisher/);
   assert.match(checklist, /workflow 文件为 `publish\.yml`/);
