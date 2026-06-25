@@ -16,7 +16,7 @@
 
 ## 构建、测试与开发命令
 
-当前还没有 package manifest。TypeScript CLI 初始化后，请在 `package.json` 中提供这些命令：
+当前使用 npm 管理 TypeScript CLI。常用命令如下：
 
 - `npm run dev`：本地运行 CLI。
 - `npm run build`：编译发布产物。
