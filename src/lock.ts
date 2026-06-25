@@ -8,8 +8,40 @@ export interface RemoteLockOptions {
   createTargetPath?: boolean;
 }
 
+export interface RemoteLockStatus {
+  locked: boolean;
+  lockPath: string;
+  pid?: string;
+  createdAt?: string;
+}
+
 export function getRemoteLockPath(config: SshReleaseConfig): string {
   return remoteJoin(config.target.path, remoteLockDir);
+}
+
+export async function readRemoteLockStatus(
+  config: SshReleaseConfig,
+  client: RemoteClient,
+): Promise<RemoteLockStatus> {
+  const lockPath = getRemoteLockPath(config);
+  const pidPath = remoteJoin(lockPath, 'pid');
+  const createdAtPath = remoteJoin(lockPath, 'created_at');
+  const result = await client.exec(`if [ -d ${shellQuote(lockPath)} ]; then echo locked; printf 'pid='; cat ${shellQuote(pidPath)} 2>/dev/null || true; printf '\\ncreated_at='; cat ${shellQuote(createdAtPath)} 2>/dev/null || true; printf '\\n'; else echo unlocked; fi`);
+  const lines = result.stdout.split('\n').map((line) => line.trim());
+
+  if (lines[0] !== 'locked') {
+    return {
+      locked: false,
+      lockPath,
+    };
+  }
+
+  return {
+    locked: true,
+    lockPath,
+    pid: parseRemoteLockValue(lines, 'pid'),
+    createdAt: parseRemoteLockValue(lines, 'created_at'),
+  };
 }
 
 export async function acquireRemoteLock(
@@ -33,4 +65,12 @@ export async function acquireRemoteLock(
   return async () => {
     await client.exec(`rm -rf ${shellQuote(lockPath)}`);
   };
+}
+
+function parseRemoteLockValue(lines: string[], fieldName: string): string | undefined {
+  const prefix = `${fieldName}=`;
+  const line = lines.find((entry) => entry.startsWith(prefix));
+  const value = line?.slice(prefix.length).trim();
+
+  return value || undefined;
 }

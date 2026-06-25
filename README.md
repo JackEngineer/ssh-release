@@ -11,7 +11,7 @@
 已实现：
 
 - `ssh-release init`：生成 `ssh-release.config.ts` 配置模板。
-- `ssh-release doctor`：检查配置、本地源路径、SSH 连接、远程目录和远端 `tar`。
+- `ssh-release doctor`：检查配置、本地源路径、SSH 连接、远程目录、远端锁和远端 `tar`。
 - `ssh-release deploy`：发布本地文件或目录。
 - `ssh-release list`：查看远程版本和当前版本。
 - `ssh-release rollback [version]`：回滚到上一个版本或指定版本。
@@ -167,6 +167,8 @@ source files -> package -> upload -> release -> activate -> rollback
 ```bash
 ssh-release doctor
 ```
+
+`doctor` 会检查 `.ssh-release.lock`。没有锁时正常通过；如果发现锁，会以 `warn` 显示锁路径、pid、创建时间和安全清理提示。
 
 需要先查看发布计划但不修改服务器时：
 
@@ -347,6 +349,7 @@ docs/
 - macOS AppleDouble 元数据排除。
 - `release` 和 `overwrite` 发布流程。
 - 发布和回滚锁获取、释放和锁冲突拦截。
+- `doctor` 远端锁状态检查和安全清理提示。
 - 远端 `tar` 失败后的逐文件上传回退。
 - 远程版本列表读取和当前版本标记。
 - `doctor` 检查结果。

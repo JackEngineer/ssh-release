@@ -12,9 +12,21 @@ import type { SshReleaseConfig } from '../src/types.js';
 class FakeRemoteClient implements RemoteClient {
   commands: string[] = [];
   tarAvailable = true;
+  lockInfo: { pid?: string; createdAt?: string } | undefined;
 
   async exec(command: string): Promise<{ stdout: string; stderr: string }> {
     this.commands.push(command);
+
+    if (command.includes('/var/www/site/.ssh-release.lock')) {
+      if (!this.lockInfo) {
+        return { stdout: 'unlocked\n', stderr: '' };
+      }
+
+      return {
+        stdout: `locked\npid=${this.lockInfo.pid ?? ''}\ncreated_at=${this.lockInfo.createdAt ?? ''}\n`,
+        stderr: '',
+      };
+    }
 
     if (command.includes('readlink')) {
       return { stdout: 'releases/20260625-121000\n', stderr: '' };
@@ -92,10 +104,40 @@ test('doctor reports config, source, ssh, remote path, and tar checks', async ()
       ['本地源路径', 'pass'],
       ['SSH 连接', 'pass'],
       ['远程目录', 'pass'],
+      ['远端锁', 'pass'],
       ['远端 tar', 'pass'],
     ],
   );
+  assert.equal(
+    report.checks.find((check) => check.name === '远端锁')?.message,
+    '没有发现发布或回滚锁',
+  );
   assert.ok(client.commands.some((command) => command.includes('command -v tar')));
+});
+
+test('doctor warns when remote lock exists and prints safe cleanup guidance', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'ssh-release-doctor-lock-'));
+  const sourcePath = path.join(root, 'dist');
+  const configPath = path.join(root, 'ssh-release.config.ts');
+  await mkdir(sourcePath, { recursive: true });
+  await writeFile(path.join(sourcePath, 'index.html'), '<h1>ok</h1>');
+  await writeFile(configPath, 'export default {};');
+
+  const client = new FakeRemoteClient();
+  client.lockInfo = {
+    pid: '12345',
+    createdAt: '2026-06-25T13:20:00Z',
+  };
+
+  const report = await runDoctor(createConfig({ sourcePath }), client, { configPath });
+  const lockCheck = report.checks.find((check) => check.name === '远端锁');
+
+  assert.equal(report.ok, true);
+  assert.equal(lockCheck?.status, 'warn');
+  assert.equal(lockCheck?.message.includes('/var/www/site/.ssh-release.lock'), true);
+  assert.equal(lockCheck?.message.includes('pid: 12345'), true);
+  assert.equal(lockCheck?.message.includes('创建时间: 2026-06-25T13:20:00Z'), true);
+  assert.equal(lockCheck?.message.includes('确认没有发布或回滚任务后'), true);
 });
 
 test('doctor warns when remote tar is unavailable but still allows fallback', async () => {

@@ -1,6 +1,7 @@
 import { access } from 'node:fs/promises';
 
 import { loadConfigFile } from './config.js';
+import { readRemoteLockStatus } from './lock.js';
 import { shellQuote } from './remote.js';
 import type { RemoteClient } from './ssh.js';
 import type { SshReleaseConfig } from './types.js';
@@ -70,6 +71,7 @@ export async function runDoctor(
     () => client.exec(`mkdir -p ${shellQuote(config.target.path)} && test -w ${shellQuote(config.target.path)}`),
     '远程目录可创建且可写',
   );
+  await addRemoteLockCheck(checks, config, client);
 
   try {
     await client.exec('command -v tar');
@@ -114,6 +116,42 @@ async function addConfigFileCheck(checks: DoctorCheck[], configPath?: string): P
       name: '配置文件',
       status: 'fail',
       message: `配置文件不存在: ${configPath}`,
+    });
+  }
+}
+
+async function addRemoteLockCheck(
+  checks: DoctorCheck[],
+  config: SshReleaseConfig,
+  client: RemoteClient,
+): Promise<void> {
+  try {
+    const lockStatus = await readRemoteLockStatus(config, client);
+
+    if (!lockStatus.locked) {
+      checks.push({
+        name: '远端锁',
+        status: 'pass',
+        message: '没有发现发布或回滚锁',
+      });
+      return;
+    }
+
+    checks.push({
+      name: '远端锁',
+      status: 'warn',
+      message: [
+        `发现远端锁: ${lockStatus.lockPath}`,
+        `pid: ${lockStatus.pid ?? '未知'}`,
+        `创建时间: ${lockStatus.createdAt ?? '未知'}`,
+        '确认没有发布或回滚任务后再手动删除该目录',
+      ].join('；'),
+    });
+  } catch (error) {
+    checks.push({
+      name: '远端锁',
+      status: 'fail',
+      message: error instanceof Error ? error.message : String(error),
     });
   }
 }
