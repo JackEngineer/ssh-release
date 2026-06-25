@@ -1,10 +1,14 @@
 # Changelog
 
-## Unreleased
+## 1.0.1 - 2026-06-25
 
 ### Added
 
 - 增加基于 npm Trusted Publishing 的 GitHub Actions 自动发布 workflow，推送版本标签后可通过 OIDC 发布 npm 包。
+
+### Fixed
+
+- 固定 GitHub Actions 测试时区，避免版本号测试在 UTC runner 中失败。
 
 ## 1.0.0 - 2026-06-25
 
