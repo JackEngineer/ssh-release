@@ -253,13 +253,16 @@ npm publish --dry-run
 
 ```bash
 PACK_DIR=$(mktemp -d)
+VERSION=$(node -p "JSON.parse(require('fs').readFileSync('package.json', 'utf8')).version")
 npm pack --pack-destination "$PACK_DIR"
-npm install -g "$PACK_DIR"/ssh-release-0.1.0.tgz --prefix "$PACK_DIR/prefix"
+npm install -g "$PACK_DIR"/ssh-release-"$VERSION".tgz --prefix "$PACK_DIR/prefix"
 "$PACK_DIR/prefix/bin/ssh-release"
 "$PACK_DIR/prefix/bin/ssh-release" init
 ```
 
 `npm publish` 会发布到 npm registry，只有确认版本号、包内容、登录账号和发布权限都正确后再执行。
+
+完整发布步骤见 [docs/release-checklist.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/release-checklist.md)。
 
 ## 项目结构
 
@@ -293,6 +296,7 @@ tests/
 └── validate.test.ts
 
 docs/
+├── release-checklist.md
 └── superpowers/specs/2026-06-25-ssh-release-design.md
 ```
 
