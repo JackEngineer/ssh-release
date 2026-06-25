@@ -28,6 +28,7 @@ test('declares npm publish boundaries and verification hooks', async () => {
   assert.deepEqual(packageJson.files, [
     'dist',
     'README.md',
+    'CHANGELOG.md',
     'LICENSE',
   ]);
   assert.equal(packageJson.engines?.node, '>=20.0.0');

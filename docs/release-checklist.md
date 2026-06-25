@@ -28,8 +28,8 @@ npm publish --dry-run
 
 - 命令退出码为 `0`。
 - 没有 `npm auto-corrected` 之类的自动修正警告。
-- tarball 内容只包含 `LICENSE`、`README.md`、`package.json` 和 `dist/`。
-- `package.json`、`README.md` 和 `dist/cli.js` 出现在 tarball 内容中。
+- tarball 内容只包含 `LICENSE`、`README.md`、`CHANGELOG.md`、`package.json` 和 `dist/`。
+- `package.json`、`README.md`、`CHANGELOG.md` 和 `dist/cli.js` 出现在 tarball 内容中。
 
 ## 本地安装烟测
 

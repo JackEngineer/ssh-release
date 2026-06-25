@@ -264,9 +264,12 @@ npm install -g "$PACK_DIR"/ssh-release-"$VERSION".tgz --prefix "$PACK_DIR/prefix
 
 完整发布步骤见 [docs/release-checklist.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/release-checklist.md)。
 
+版本变更见 [CHANGELOG.md](https://github.com/JackEngineer/ssh-release/blob/main/CHANGELOG.md)。
+
 ## 项目结构
 
 ```text
+CHANGELOG.md
 src/
 ├── cli.ts
 ├── config.ts
