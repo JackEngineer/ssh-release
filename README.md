@@ -363,6 +363,8 @@ npm install -g "$PACK_DIR"/ssh-release-"$VERSION".tgz --prefix "$PACK_DIR/prefix
 
 完整发布步骤见 [docs/release-checklist.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/release-checklist.md)。
 
+GitHub Actions 发布模板见 [docs/github-actions.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/github-actions.md)。
+
 版本变更见 [CHANGELOG.md](https://github.com/JackEngineer/ssh-release/blob/main/CHANGELOG.md)。
 
 ## 项目结构
@@ -403,6 +405,7 @@ tests/
 └── validate.test.ts
 
 docs/
+├── github-actions.md
 ├── release-checklist.md
 └── superpowers/specs/2026-06-25-ssh-release-design.md
 ```

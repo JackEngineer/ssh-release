@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0 - 2026-06-25
+
+### Added
+
+- 增加 GitHub Actions 发布模板文档，覆盖 Pull Request 预检、生产发布、`--json --progress` 输出、环境保护和 Secrets 使用方式。
+
 ## 0.7.0 - 2026-06-25
 
 ### Added
