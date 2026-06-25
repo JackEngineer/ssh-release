@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
 
-import { isCliEntrypoint, runCli } from '../src/cli.js';
+import { isCliEntrypoint, runCli, type DeployCliOptions } from '../src/cli.js';
 
 test('prints help and version without running command handlers', async () => {
   const stdout: string[] = [];
@@ -327,6 +327,49 @@ test('prints command failures as json errors', async () => {
     error: 'deploy failed',
   });
   assert.deepEqual(stderr, []);
+});
+
+test('prints deploy progress as ndjson before the final json result', async () => {
+  const stdout: string[] = [];
+
+  assert.equal(await runCli(['deploy', '--json', '--progress'], {
+    io: {
+      log: (message: string) => stdout.push(message),
+      error: () => undefined,
+    },
+    handlers: {
+      ...createFailingHandlers(),
+      deploy: async (options?: DeployCliOptions) => {
+        options?.onProgress?.({ stage: 'package', status: 'start' });
+        options?.onProgress?.({ stage: 'package', status: 'success' });
+        return {
+          mode: 'release' as const,
+          version: '20260625-180000',
+          targetPath: '/var/www/site/releases/20260625-180000',
+          currentSymlink: '/var/www/site/current',
+          usedFallback: false,
+          warnings: [],
+        };
+      },
+    },
+  }), 0);
+
+  assert.equal(stdout.length, 3);
+  assert.deepEqual(JSON.parse(stdout[0]), {
+    ok: true,
+    command: 'deploy',
+    event: 'progress',
+    stage: 'package',
+    status: 'start',
+  });
+  assert.deepEqual(JSON.parse(stdout[1]), {
+    ok: true,
+    command: 'deploy',
+    event: 'progress',
+    stage: 'package',
+    status: 'success',
+  });
+  assert.equal(JSON.parse(stdout[2]).result.version, '20260625-180000');
 });
 
 function createFailingHandlers() {

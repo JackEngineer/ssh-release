@@ -6,7 +6,13 @@ import { fileURLToPath } from 'node:url';
 import { CONFIG_FILE_NAME, loadConfigFile, writeConfigTemplate } from './config.js';
 import { runDoctorFromFile, type DoctorReport } from './doctor.js';
 import { listReleases, type ListReleasesResult } from './list.js';
-import { createDeployPlan, deploy, type DeployPlan, type DeployResult } from './release.js';
+import {
+  createDeployPlan,
+  deploy,
+  type DeployPlan,
+  type DeployProgressEvent,
+  type DeployResult,
+} from './release.js';
 import { rollback, type RollbackResult } from './rollback.js';
 import { createRemoteClient } from './ssh.js';
 import { unlock, type UnlockResult } from './unlock.js';
@@ -18,6 +24,7 @@ export interface CliIo {
 
 export interface DeployCliOptions {
   dryRun?: boolean;
+  onProgress?: (event: DeployProgressEvent) => void | Promise<void>;
 }
 
 export interface UnlockCliOptions {
@@ -103,7 +110,15 @@ export async function runCli(
     }
 
     if (command === 'deploy') {
-      const result = await handlers.deploy({ dryRun: parsed.dryRun });
+      const deployOptions: DeployCliOptions = {
+        dryRun: parsed.dryRun,
+      };
+
+      if (parsed.json && parsed.progress) {
+        deployOptions.onProgress = (event) => printJsonProgress('deploy', event, io);
+      }
+
+      const result = await handlers.deploy(deployOptions);
 
       if (parsed.json) {
         printJsonResult('deploy', result, 0, io);
@@ -196,6 +211,7 @@ interface ParsedCliArgs {
   error?: string;
   help: boolean;
   json: boolean;
+  progress: boolean;
   version: boolean;
 }
 
@@ -206,6 +222,7 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
   let dryRun = false;
   let help = false;
   let json = false;
+  let progress = false;
   let version = false;
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -223,6 +240,11 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
 
     if (arg === '--json') {
       json = true;
+      continue;
+    }
+
+    if (arg === '--progress') {
+      progress = true;
       continue;
     }
 
@@ -262,6 +284,14 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
     args.push(arg);
   }
 
+  if (progress && !json) {
+    return createParsedError('--progress 需要配合 --json 使用', configPath, json);
+  }
+
+  if (progress && args[0] && args[0] !== 'deploy') {
+    return createParsedError('--progress 仅支持 deploy 命令', configPath, json);
+  }
+
   return {
     args: args.slice(1),
     command: args[0],
@@ -270,6 +300,7 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
     dryRun,
     help,
     json,
+    progress,
     version,
   };
 }
@@ -282,6 +313,7 @@ function createParsedError(error: string, configPath: string, json = false): Par
     error,
     help: false,
     json,
+    progress: false,
     version: false,
   };
 }
@@ -296,7 +328,9 @@ function createDefaultHandlers(configPath: string): CliHandlers {
         return createDeployPlan(config);
       }
 
-      return deploy(config, createRemoteClient(config));
+      return deploy(config, createRemoteClient(config), {
+        onProgress: options?.onProgress,
+      });
     },
     rollback: async (version) => {
       const config = await loadConfigFile(configPath);
@@ -410,6 +444,15 @@ function printJsonResult(command: string, result: unknown, exitCode: number, io:
   }));
 }
 
+function printJsonProgress(command: string, event: DeployProgressEvent, io: CliIo): void {
+  io.log(JSON.stringify({
+    ok: true,
+    command,
+    event: 'progress',
+    ...event,
+  }));
+}
+
 function printJsonError(command: string | undefined, error: string, io: CliIo): void {
   io.log(JSON.stringify({
     ok: false,
@@ -436,6 +479,7 @@ function createUsageText(): string {
   ssh-release doctor [--config <path>]
   ssh-release deploy [--config <path>]
   ssh-release deploy --dry-run [--config <path>]
+  ssh-release deploy --json --progress [--config <path>]
   ssh-release list [--config <path>]
   ssh-release rollback [version] [--config <path>]
   ssh-release unlock [--confirm <lock-path>] [--config <path>]

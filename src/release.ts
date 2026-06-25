@@ -32,9 +32,20 @@ export interface DeployPlan {
   currentSymlink?: string;
 }
 
+export type DeployProgressStage = 'source' | 'lock' | 'package' | 'publish' | 'cleanup';
+
+export type DeployProgressStatus = 'start' | 'success' | 'fail';
+
+export interface DeployProgressEvent {
+  stage: DeployProgressStage;
+  status: DeployProgressStatus;
+  error?: string;
+}
+
 export interface DeployOptions {
   now?: Date;
   createPackage?: (options: CreateReleasePackageOptions) => Promise<ReleasePackage>;
+  onProgress?: (event: DeployProgressEvent) => void | Promise<void>;
 }
 
 export function createVersionName(date = new Date()): string {
@@ -77,57 +88,67 @@ export async function deploy(
   client: RemoteClient,
   options: DeployOptions = {},
 ): Promise<DeployResult> {
-  await ensureSourceExists(config.source.path);
+  await withDeployProgress(options, 'source', () => ensureSourceExists(config.source.path));
 
   const versionName = createVersionName(options.now ?? new Date());
   const packageFactory = options.createPackage ?? createReleasePackage;
-  const releaseLock = await acquireRemoteLock(config, client);
+  const releaseLock = await withDeployProgress(options, 'lock', () => acquireRemoteLock(config, client));
   let releasePackage: ReleasePackage | undefined;
   let result: DeployResult | undefined;
   let deployError: unknown;
   let cleanupError: unknown;
 
   try {
-    releasePackage = await packageFactory({
+    releasePackage = await withDeployProgress(options, 'package', () => packageFactory({
       sourcePath: config.source.path,
       exclude: config.source.exclude,
       versionName,
-    });
+    }));
 
     if (config.deploy.mode === 'overwrite') {
-      result = await deployOverwrite(config, client, releasePackage, versionName);
+      result = await withDeployProgress(
+        options,
+        'publish',
+        () => deployOverwrite(config, client, releasePackage as ReleasePackage, versionName),
+      );
       return result;
     }
 
-    result = await deployRelease(config, client, releasePackage, versionName);
+    result = await withDeployProgress(
+      options,
+      'publish',
+      () => deployRelease(config, client, releasePackage as ReleasePackage, versionName),
+    );
     return result;
   } catch (error) {
     deployError = error;
     throw error;
   } finally {
-    if (releasePackage) {
+    await withDeployProgress(options, 'cleanup', async () => {
+      if (releasePackage) {
+        try {
+          await releasePackage.cleanup();
+        } catch (error) {
+          cleanupError = error;
+        }
+      }
+
       try {
-        await releasePackage.cleanup();
+        await releaseLock();
       } catch (error) {
-        cleanupError = error;
+        const message = `远程发布锁清理失败: ${formatError(error)}`;
+
+        if (result) {
+          result.warnings.push(message);
+        } else if (!deployError && !cleanupError) {
+          cleanupError = error;
+        }
       }
-    }
 
-    try {
-      await releaseLock();
-    } catch (error) {
-      const message = `远程发布锁清理失败: ${formatError(error)}`;
-
-      if (result) {
-        result.warnings.push(message);
-      } else if (!deployError && !cleanupError) {
-        cleanupError = error;
+      if (cleanupError && !deployError) {
+        throw cleanupError;
       }
-    }
-
-    if (cleanupError && !deployError) {
-      throw cleanupError;
-    }
+    });
   }
 }
 
@@ -304,4 +325,32 @@ async function ensureSourceExists(sourcePath: string): Promise<void> {
 
 function formatError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+async function withDeployProgress<T>(
+  options: DeployOptions,
+  stage: DeployProgressStage,
+  run: () => Promise<T>,
+): Promise<T> {
+  await emitDeployProgress(options, { stage, status: 'start' });
+
+  try {
+    const result = await run();
+    await emitDeployProgress(options, { stage, status: 'success' });
+    return result;
+  } catch (error) {
+    await emitDeployProgress(options, {
+      stage,
+      status: 'fail',
+      error: formatError(error),
+    });
+    throw error;
+  }
+}
+
+async function emitDeployProgress(
+  options: DeployOptions,
+  event: DeployProgressEvent,
+): Promise<void> {
+  await options.onProgress?.(event);
 }

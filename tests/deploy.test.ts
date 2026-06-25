@@ -70,6 +70,36 @@ test('deploys release mode with package upload, tar extraction, symlink switch, 
   assert.ok(client.commands.some((command) => command.includes("rm -rf '/var/www/site/releases/20260625-120000'")));
 });
 
+test('emits deploy progress events for release stages', async () => {
+  const { config, sourcePath } = await createConfig();
+  const client = new FakeRemoteClient();
+  const progressEvents: Array<{ stage: string; status: string }> = [];
+
+  await deploy(config, client, {
+    now: new Date('2026-06-25T15:30:00+08:00'),
+    createPackage: async () => ({
+      archivePath: path.join(sourcePath, 'release.tgz'),
+      cleanup: async () => {},
+    }),
+    onProgress: (event) => {
+      progressEvents.push(event);
+    },
+  });
+
+  assert.deepEqual(progressEvents, [
+    { stage: 'source', status: 'start' },
+    { stage: 'source', status: 'success' },
+    { stage: 'lock', status: 'start' },
+    { stage: 'lock', status: 'success' },
+    { stage: 'package', status: 'start' },
+    { stage: 'package', status: 'success' },
+    { stage: 'publish', status: 'start' },
+    { stage: 'publish', status: 'success' },
+    { stage: 'cleanup', status: 'start' },
+    { stage: 'cleanup', status: 'success' },
+  ]);
+});
+
 test('falls back to directory upload when remote tar extraction fails', async () => {
   const { config, sourcePath } = await createConfig();
   const client = new FakeRemoteClient();

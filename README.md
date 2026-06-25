@@ -17,6 +17,7 @@
 - `ssh-release rollback [version]`：回滚到上一个版本或指定版本。
 - `ssh-release unlock`：查看远端锁，并在显式确认锁路径后删除锁。
 - `--json`：输出单行 JSON，便于 CI/CD 解析。
+- `deploy --json --progress`：发布时输出 NDJSON 阶段进度，便于 CI/CD 展示实时状态。
 - `release` 模式：上传压缩包、远端解压、切换 `current`、清理旧版本。
 - `overwrite` 模式：直接覆盖发布到目标目录。
 - 远端 `tar` 解压失败时回退逐文件上传。
@@ -231,6 +232,7 @@ ssh-release rollback 20260625-150000
 
 ```bash
 ssh-release deploy --dry-run --json
+ssh-release deploy --json --progress
 ssh-release doctor --json
 ssh-release list --json
 ssh-release rollback --json
@@ -248,6 +250,22 @@ ssh-release unlock --json
 ```json
 {"ok":false,"command":"deploy","error":"错误信息"}
 ```
+
+发布时需要持续读取阶段状态，可以使用：
+
+```bash
+ssh-release deploy --json --progress
+```
+
+该模式会按行输出 NDJSON。进度事件先输出，最终结果最后输出：
+
+```json
+{"ok":true,"command":"deploy","event":"progress","stage":"package","status":"start"}
+{"ok":true,"command":"deploy","event":"progress","stage":"package","status":"success"}
+{"ok":true,"command":"deploy","result":{"mode":"release","version":"20260625-153000"}}
+```
+
+`stage` 可能是 `source`、`lock`、`package`、`publish`、`cleanup`，`status` 可能是 `start`、`success`、`fail`。失败事件会包含 `error` 字段。
 
 `doctor` 检查失败、`unlock` 发现锁但未删除时会返回非零退出码，并在 JSON 的 `result` 中保留检查结果。
 

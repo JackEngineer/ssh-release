@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0 - 2026-06-25
+
+### Added
+
+- 增加 `ssh-release deploy --json --progress`，发布时按 NDJSON 输出 `source`、`lock`、`package`、`publish`、`cleanup` 阶段状态，并在最后输出发布结果。
+
 ## 0.5.0 - 2026-06-25
 
 ### Added
