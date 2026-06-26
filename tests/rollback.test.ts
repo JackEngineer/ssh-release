@@ -51,11 +51,53 @@ test('rolls back to the previous remote release by switching current symlink', a
   const result = await rollback(createConfig(), client);
 
   assert.equal(result.version, '20260625-121000');
+  assert.equal(result.verified, true);
+  assert.deepEqual(result.verification, [
+    {
+      name: '目标版本',
+      status: 'pass',
+      message: '目标版本目录存在',
+    },
+    {
+      name: '当前版本',
+      status: 'pass',
+      message: 'current 已指向目标版本',
+    },
+    {
+      name: '远端锁',
+      status: 'pass',
+      message: '回滚锁已清理',
+    },
+  ]);
   assert.equal(result.warnings.length, 0);
   assert.equal(client.commands[0].includes('/var/www/site/.ssh-release.lock'), true);
   assert.ok(client.commands.some((command) => command.includes("ln -sfn 'releases/20260625-121000' '/var/www/site/current'")));
-  assert.equal(client.commands.at(-1), "rm -rf '/var/www/site/.ssh-release.lock'");
+  assert.equal(client.commands.some((command) => command === "rm -rf '/var/www/site/.ssh-release.lock'"), true);
   assert.equal(client.commands.some((command) => command.includes("rm -rf '/var/www/site/releases")), false);
+});
+
+test('emits rollback progress around lock, switch, cleanup, and verify stages', async () => {
+  const client = new FakeRemoteClient();
+  const events: unknown[] = [];
+
+  const result = await rollback(createConfig(), client, undefined, {
+    onProgress: (event) => {
+      events.push(event);
+    },
+  });
+
+  assert.equal(result.version, '20260625-121000');
+  assert.equal(result.verified, true);
+  assert.deepEqual(events, [
+    { stage: 'lock', status: 'start' },
+    { stage: 'lock', status: 'success' },
+    { stage: 'switch', status: 'start' },
+    { stage: 'switch', status: 'success' },
+    { stage: 'cleanup', status: 'start' },
+    { stage: 'cleanup', status: 'success' },
+    { stage: 'verify', status: 'start' },
+    { stage: 'verify', status: 'success' },
+  ]);
 });
 
 test('creates a rollback plan for the previous release without mutating remote state', async () => {
@@ -147,6 +189,7 @@ test('stops rollback plan before reading versions when the remote lock exists', 
 
 class FakeRemoteClient implements RemoteClient {
   commands: string[] = [];
+  currentTarget = 'releases/20260625-122000';
   existingLock = false;
   failLock = false;
 
@@ -173,7 +216,11 @@ class FakeRemoteClient implements RemoteClient {
     }
 
     if (command.includes('readlink')) {
-      return { stdout: 'releases/20260625-122000\n', stderr: '' };
+      return { stdout: `${this.currentTarget}\n`, stderr: '' };
+    }
+
+    if (command.includes("ln -sfn 'releases/20260625-121000' '/var/www/site/current'")) {
+      this.currentTarget = 'releases/20260625-121000';
     }
 
     return { stdout: '', stderr: '' };

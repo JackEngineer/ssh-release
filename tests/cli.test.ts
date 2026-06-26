@@ -775,6 +775,85 @@ test('prints deploy progress as ndjson before the final json result', async () =
   assert.equal(JSON.parse(stdout[2]).result.version, '20260625-180000');
 });
 
+test('prints rollback progress as ndjson before the final json result', async () => {
+  const stdout: string[] = [];
+
+  assert.equal(await runCli(['rollback', '--json', '--progress'], {
+    io: {
+      log: (message: string) => stdout.push(message),
+      error: () => undefined,
+    },
+    handlers: {
+      ...createFailingHandlers(),
+      rollback: async (version?: string, options?: RollbackCliOptions) => {
+        assert.equal(version, undefined);
+        options?.onProgress?.({ stage: 'switch', status: 'start' });
+        options?.onProgress?.({ stage: 'switch', status: 'success' });
+        return {
+          version: '20260625-121000',
+          currentSymlink: '/var/www/site/current',
+          verified: true,
+          verification: [
+            {
+              name: '当前版本',
+              status: 'pass' as const,
+              message: 'current 已指向目标版本',
+            },
+          ],
+          warnings: [],
+        };
+      },
+    },
+  }), 0);
+
+  assert.equal(stdout.length, 3);
+  assert.deepEqual(JSON.parse(stdout[0]), {
+    ok: true,
+    command: 'rollback',
+    event: 'progress',
+    stage: 'switch',
+    status: 'start',
+  });
+  assert.deepEqual(JSON.parse(stdout[1]), {
+    ok: true,
+    command: 'rollback',
+    event: 'progress',
+    stage: 'switch',
+    status: 'success',
+  });
+  assert.equal(JSON.parse(stdout[2]).result.verified, true);
+});
+
+test('prints remote verification status after rollback succeeds', async () => {
+  const stdout: string[] = [];
+
+  assert.equal(await runCli(['rollback'], {
+    io: {
+      log: (message: string) => stdout.push(message),
+      error: () => undefined,
+    },
+    handlers: {
+      ...createFailingHandlers(),
+      rollback: async () => ({
+        version: '20260625-121000',
+        currentSymlink: '/var/www/site/current',
+        verified: true,
+        verification: [
+          {
+            name: '当前版本',
+            status: 'pass' as const,
+            message: 'current 已指向目标版本',
+          },
+        ],
+        warnings: [],
+      }),
+    },
+  }), 0);
+
+  assert.equal(stdout.includes('回滚校验通过'), true);
+  assert.equal(stdout.includes('校验: 当前版本 - current 已指向目标版本'), true);
+});
+
 test('prints remote verification status after deploy succeeds', async () => {
   const stdout: string[] = [];
 

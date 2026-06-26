@@ -46,6 +46,7 @@ test('documents stable CLI, JSON, config, and safety contracts for 1.0', async (
 
   assert.match(guide, /1\.0\.0/);
   assert.match(guide, /ssh-release deploy --json --progress/);
+  assert.match(guide, /ssh-release rollback \[version\] --json --progress/);
   assert.match(guide, /ssh-release deploy --plan/);
   assert.match(guide, /ssh-release rollback \[version\] --plan/);
   assert.match(guide, /"ok": true/);
@@ -67,6 +68,7 @@ test('documents stable CLI, JSON, config, and safety contracts for 1.0', async (
   assert.match(readme, /发布 manifest/);
   assert.match(readme, /ssh-release deploy --plan/);
   assert.match(readme, /ssh-release rollback \[version\] --plan/);
+  assert.match(readme, /ssh-release rollback --json --progress/);
   assert.match(readme, /manifest\.json/);
   assert.match(readme, /docs\/contracts\.md/);
 });
@@ -84,6 +86,7 @@ test('documents first release setup and platform dependencies', async () => {
   assert.match(quickStart, /ssh-release deploy --plan/);
   assert.match(quickStart, /ssh-release deploy --json --progress/);
   assert.match(quickStart, /ssh-release rollback --plan/);
+  assert.match(quickStart, /ssh-release rollback --json --progress/);
   assert.match(quickStart, /SSH_RELEASE_HOST/);
   assert.match(quickStart, /SSH_RELEASE_USER/);
   assert.match(quickStart, /source\.path/);
