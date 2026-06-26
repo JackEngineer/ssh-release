@@ -100,6 +100,34 @@ test('emits rollback progress around lock, switch, cleanup, and verify stages', 
   ]);
 });
 
+test('waits for rollback lock release before reporting cleanup success', async () => {
+  const client = new FakeRemoteClient();
+  client.staleLockReadsAfterRelease = 1;
+  const events: Array<{ stage: string; status: string; error?: string }> = [];
+
+  const result = await rollback(createConfig(), client, undefined, {
+    onProgress: (event) => {
+      events.push(event);
+    },
+  });
+
+  assert.equal(result.verified, true);
+  assert.deepEqual(events, [
+    { stage: 'lock', status: 'start' },
+    { stage: 'lock', status: 'success' },
+    { stage: 'switch', status: 'start' },
+    { stage: 'switch', status: 'success' },
+    { stage: 'cleanup', status: 'start' },
+    { stage: 'cleanup', status: 'success' },
+    { stage: 'verify', status: 'start' },
+    { stage: 'verify', status: 'success' },
+  ]);
+  assert.equal(
+    client.commands.filter((command) => command.startsWith("if [ -d '/var/www/site/.ssh-release.lock' ]")).length,
+    3,
+  );
+});
+
 test('creates a rollback plan for the previous release without mutating remote state', async () => {
   const client = new FakeRemoteClient();
 
@@ -192,12 +220,22 @@ class FakeRemoteClient implements RemoteClient {
   currentTarget = 'releases/20260625-122000';
   existingLock = false;
   failLock = false;
+  lockExists = false;
+  staleLockReadsAfterRelease = 0;
+  private pendingLockReleaseReads = 0;
 
   async exec(command: string): Promise<{ stdout: string; stderr: string }> {
     this.commands.push(command);
 
     if (command.startsWith("if [ -d '/var/www/site/.ssh-release.lock' ]")) {
-      if (this.existingLock) {
+      if (this.existingLock || this.lockExists) {
+        if (this.pendingLockReleaseReads > 0) {
+          this.pendingLockReleaseReads -= 1;
+          if (this.pendingLockReleaseReads === 0) {
+            this.lockExists = false;
+          }
+        }
+
         return {
           stdout: 'locked\npid=12345\ncreated_at=2026-06-25T13:30:00Z\n',
           stderr: '',
@@ -209,6 +247,20 @@ class FakeRemoteClient implements RemoteClient {
 
     if (this.failLock && command.includes('/var/www/site/.ssh-release.lock')) {
       throw new Error('远程已有发布任务正在运行');
+    }
+
+    if (command.includes("mkdir '/var/www/site/.ssh-release.lock'")) {
+      this.lockExists = true;
+      return { stdout: '', stderr: '' };
+    }
+
+    if (command === "rm -rf '/var/www/site/.ssh-release.lock'") {
+      this.pendingLockReleaseReads = this.staleLockReadsAfterRelease;
+      if (this.pendingLockReleaseReads === 0) {
+        this.lockExists = false;
+      }
+
+      return { stdout: '', stderr: '' };
     }
 
     if (command.includes('for release_path in')) {

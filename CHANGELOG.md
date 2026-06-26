@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.0 - 2026-06-27
+
+### Added
+
+- 增加真实服务器 dogfood 脚本和文档，固化一次性 `/tmp/ssh-release-dogfood-*` 发布、回滚、校验和清理流程。
+
 ## 1.3.0 - 2026-06-26
 
 ### Added

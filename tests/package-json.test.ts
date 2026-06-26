@@ -50,5 +50,5 @@ test('prepares the next minor release version', async () => {
     await readFile(new URL('../package.json', import.meta.url), 'utf8'),
   ) as PackageJson;
 
-  assert.equal(packageJson.version, '1.3.0');
+  assert.equal(packageJson.version, '1.4.0');
 });

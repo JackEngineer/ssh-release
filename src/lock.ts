@@ -15,6 +15,12 @@ export interface RemoteLockStatus {
   createdAt?: string;
 }
 
+export interface WaitForRemoteLockReleasedOptions {
+  label?: string;
+  attempts?: number;
+  delayMs?: number;
+}
+
 export function getRemoteLockPath(config: SshReleaseConfig): string {
   return remoteJoin(config.target.path, remoteLockDir);
 }
@@ -74,10 +80,40 @@ export async function removeRemoteLock(
   await client.exec(`rm -rf ${shellQuote(getRemoteLockPath(config))}`);
 }
 
+export async function waitForRemoteLockReleased(
+  config: SshReleaseConfig,
+  client: RemoteClient,
+  options: WaitForRemoteLockReleasedOptions = {},
+): Promise<void> {
+  const label = options.label ?? '远端锁';
+  const attempts = Math.max(1, options.attempts ?? 4);
+  const delayMs = Math.max(0, options.delayMs ?? 50);
+  let lockStatus = await readRemoteLockStatus(config, client);
+
+  for (let attempt = 1; attempt < attempts && lockStatus.locked; attempt += 1) {
+    await delay(delayMs);
+    lockStatus = await readRemoteLockStatus(config, client);
+  }
+
+  if (lockStatus.locked) {
+    throw new Error(`${label}未清理: ${lockStatus.lockPath}`);
+  }
+}
+
 function parseRemoteLockValue(lines: string[], fieldName: string): string | undefined {
   const prefix = `${fieldName}=`;
   const line = lines.find((entry) => entry.startsWith(prefix));
   const value = line?.slice(prefix.length).trim();
 
   return value || undefined;
+}
+
+async function delay(ms: number): Promise<void> {
+  if (ms === 0) {
+    return;
+  }
+
+  await new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
