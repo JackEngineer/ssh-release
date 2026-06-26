@@ -16,6 +16,8 @@ ssh-release list --json
 
 常见可恢复失败会额外给出下一步提示。普通命令输出显示 `下一步:`，JSON 输出使用 `hint` 字段。
 
+`doctor` 会先检查本地 `tar`、`ssh`、`scp`，使用密码登录时还会检查 `sshpass`。本地检查失败时不会继续连接远端。
+
 ## 远端锁存在
 
 现象：
@@ -88,6 +90,19 @@ ssh-release deploy --json --progress
 2. 确认服务器允许对应认证方式。
 3. 使用受控环境手动运行 `ssh-release doctor --json`。
 4. 不要在 CI 日志中打印密码、私钥或完整连接命令。
+
+## 远端 hash 缺失
+
+现象：
+
+- `doctor` 的 `远端 hash` 检查失败。
+- `deploy` 最后校验 `manifest.json` hash 失败。
+
+处理：
+
+1. 在服务器安装 `sha256sum` 或 `shasum`。
+2. 重新运行 `ssh-release doctor --json`。
+3. `远端 hash` 通过后再重新发布。
 
 ## 回滚失败
 

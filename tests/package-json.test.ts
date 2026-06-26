@@ -15,6 +15,7 @@ interface PackageJson {
     url?: string;
   };
   scripts?: Record<string, string>;
+  version?: string;
 }
 
 test('declares npm publish boundaries and verification hooks', async () => {
@@ -42,4 +43,12 @@ test('declares npm publish boundaries and verification hooks', async () => {
   assert.equal(packageJson.homepage, 'https://github.com/JackEngineer/ssh-release#readme');
   assert.equal(packageJson.scripts?.prepack, 'npm run build');
   assert.equal(packageJson.scripts?.prepublishOnly, 'npm run lint && npm test && npm run build');
+});
+
+test('prepares the next minor release version', async () => {
+  const packageJson = JSON.parse(
+    await readFile(new URL('../package.json', import.meta.url), 'utf8'),
+  ) as PackageJson;
+
+  assert.equal(packageJson.version, '1.2.0');
 });

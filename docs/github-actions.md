@@ -124,7 +124,7 @@ jobs:
 
 ## 失败处理
 
-- `doctor` 失败时，先按 JSON 中的检查项修复配置、SSH 连接、远端目录、远端锁或 `tar` 环境。
+- `doctor` 失败时，先按 JSON 中的检查项修复配置、本地命令、SSH 连接、远端目录、远端 hash、远端锁或 `tar` 环境。
 - `deploy` 失败且提示远端锁存在时，先确认没有其他发布任务，再使用 `ssh-release unlock --confirm <lock-path>` 清理。
 - `deploy` 失败且提示远端校验失败时，不要继续执行后续发布步骤，先检查 `current` 指向、版本目录和远端锁状态。
 - 不要在 workflow 日志中打印真实密码、私钥或完整生产配置。

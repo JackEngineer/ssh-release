@@ -206,6 +206,11 @@ test('init writes a custom config path', async (t) => {
   const content = await readFile(configPath, 'utf8');
   assert.match(content, /export default/);
   assert.equal(stdout.includes(`已创建 ${configPath}`), true);
+  assert.equal(stdout.includes('下一步:'), true);
+  assert.equal(stdout.includes('1. 设置 SSH_RELEASE_HOST、SSH_RELEASE_USER，并选择密码或私钥认证。'), true);
+  assert.equal(stdout.includes('2. 确认 source.path 和 target.path 指向要发布的本地目录和远端目录。'), true);
+  assert.equal(stdout.includes(`3. 运行 ssh-release doctor --config ${configPath} 检查配置和服务器连接。`), true);
+  assert.equal(stdout.includes(`4. 运行 ssh-release deploy --plan --config ${configPath} 预览发布计划。`), true);
 });
 
 test('passes dry-run option to deploy handler and prints deploy plan', async () => {
@@ -617,6 +622,60 @@ test('prints command failures as json errors', async () => {
     ok: false,
     command: 'deploy',
     error: 'deploy failed',
+  });
+  assert.deepEqual(stderr, []);
+});
+
+test('prints a setup hint when the config file is missing', async () => {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+
+  assert.equal(await runCli(['doctor', '--json'], {
+    io: {
+      log: (message: string) => stdout.push(message),
+      error: (message: string) => stderr.push(message),
+    },
+    handlers: {
+      ...createFailingHandlers(),
+      doctor: async () => {
+        throw new Error('配置文件不存在: ssh-release.config.ts');
+      },
+    },
+  }), 1);
+
+  assert.equal(stdout.length, 1);
+  assert.deepEqual(JSON.parse(stdout[0]), {
+    ok: false,
+    command: 'doctor',
+    error: '配置文件不存在: ssh-release.config.ts',
+    hint: '先运行 ssh-release init 生成配置文件，再填写 source.path、server 和 target.path 后执行 ssh-release doctor。',
+  });
+  assert.deepEqual(stderr, []);
+});
+
+test('prints platform guidance when sshpass is missing', async () => {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+
+  assert.equal(await runCli(['deploy', '--json'], {
+    io: {
+      log: (message: string) => stdout.push(message),
+      error: (message: string) => stderr.push(message),
+    },
+    handlers: {
+      ...createFailingHandlers(),
+      deploy: async () => {
+        throw new Error('spawn sshpass ENOENT');
+      },
+    },
+  }), 1);
+
+  assert.equal(stdout.length, 1);
+  assert.deepEqual(JSON.parse(stdout[0]), {
+    ok: false,
+    command: 'deploy',
+    error: 'spawn sshpass ENOENT',
+    hint: '当前配置使用密码登录，本机需要安装 sshpass；macOS 可运行 brew install hudochenkov/sshpass/sshpass，Ubuntu/Debian 可运行 sudo apt-get install sshpass，Windows 和 CI 推荐改用私钥登录。',
   });
   assert.deepEqual(stderr, []);
 });
