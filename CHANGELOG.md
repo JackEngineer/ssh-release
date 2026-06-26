@@ -5,9 +5,10 @@
 ### Added
 
 - 增加首次发布指南，覆盖初始化、配置、预检、发布、列表和回滚流程。
-- 增加平台依赖说明，补充 macOS、Ubuntu/Debian、Windows 和 CI 中的 `sshpass`、OpenSSH、`tar`、hash 命令要求。
+- 增加平台依赖说明，补充 macOS、Ubuntu/Debian、Windows 和 CI 中的 `sshpass`、OpenSSH、`tar`、远端 hash 命令要求。
 - `ssh-release init` 成功后输出下一步操作提示。
 - 配置文件缺失和 `sshpass` 缺失时输出更具体的下一步提示。
+- `ssh-release doctor` 增加本地 `tar`、`ssh`、`scp`、`sshpass` 和远端 hash 命令检查。
 
 ## 1.1.0 - 2026-06-26
 

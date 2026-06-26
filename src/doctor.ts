@@ -2,6 +2,7 @@ import { access } from 'node:fs/promises';
 
 import { loadConfigFile } from './config.js';
 import { readRemoteLockStatus } from './lock.js';
+import { runProcess } from './process.js';
 import { shellQuote } from './remote.js';
 import type { RemoteClient } from './ssh.js';
 import type { SshReleaseConfig } from './types.js';
@@ -21,6 +22,7 @@ export interface DoctorReport {
 
 export interface DoctorOptions {
   configPath?: string;
+  localCommandExists?: (command: string) => Promise<boolean>;
 }
 
 export async function runDoctorFromFile(
@@ -64,12 +66,40 @@ export async function runDoctor(
     message: '配置字段有效',
   });
   await addSourcePathCheck(checks, config.source.path);
+  await addLocalDependencyChecks(
+    checks,
+    config,
+    options.localCommandExists ?? defaultLocalCommandExists,
+  );
+
+  if (checks.some((check) => check.status === 'fail')) {
+    return {
+      ok: false,
+      checks,
+    };
+  }
+
   await addRemoteCheck(checks, 'SSH 连接', () => client.exec('true'), 'SSH 可连接');
   await addRemoteCheck(
     checks,
     '远程目录',
     () => client.exec(`mkdir -p ${shellQuote(config.target.path)} && test -w ${shellQuote(config.target.path)}`),
     '远程目录可创建且可写',
+  );
+  await addRemoteCheck(
+    checks,
+    '远端 hash',
+    () => client.exec([
+      'if command -v sha256sum >/dev/null 2>&1; then',
+      'command -v sha256sum;',
+      'elif command -v shasum >/dev/null 2>&1; then',
+      'command -v shasum;',
+      'else',
+      'echo "远端缺少 sha256sum 或 shasum" >&2;',
+      'exit 1;',
+      'fi',
+    ].join(' ')),
+    '远端 sha256sum 或 shasum 可用',
   );
   await addRemoteLockCheck(checks, config, client);
 
@@ -170,6 +200,56 @@ async function addSourcePathCheck(checks: DoctorCheck[], sourcePath: string): Pr
       status: 'fail',
       message: `本地源路径不存在: ${sourcePath}`,
     });
+  }
+}
+
+async function addLocalDependencyChecks(
+  checks: DoctorCheck[],
+  config: SshReleaseConfig,
+  localCommandExists: (command: string) => Promise<boolean>,
+): Promise<void> {
+  await addLocalCommandCheck(checks, 'tar', '本地 tar', localCommandExists);
+  await addLocalCommandCheck(checks, 'ssh', '本地 ssh', localCommandExists);
+  await addLocalCommandCheck(checks, 'scp', '本地 scp', localCommandExists);
+
+  if (config.server.password) {
+    await addLocalCommandCheck(
+      checks,
+      'sshpass',
+      '本地 sshpass',
+      localCommandExists,
+      '本地 sshpass 不可用；密码登录需要安装 sshpass，或改用私钥登录',
+    );
+  }
+}
+
+async function addLocalCommandCheck(
+  checks: DoctorCheck[],
+  command: string,
+  name: string,
+  localCommandExists: (command: string) => Promise<boolean>,
+  missingMessage = `${name} 不可用；请安装后重试`,
+): Promise<void> {
+  const exists = await localCommandExists(command);
+
+  checks.push({
+    name,
+    status: exists ? 'pass' : 'fail',
+    message: exists ? `${name} 可用` : missingMessage,
+  });
+}
+
+async function defaultLocalCommandExists(command: string): Promise<boolean> {
+  try {
+    if (process.platform === 'win32') {
+      await runProcess('where.exe', [command]);
+      return true;
+    }
+
+    await runProcess('sh', ['-c', `command -v ${shellQuote(command)} >/dev/null 2>&1`]);
+    return true;
+  } catch {
+    return false;
   }
 }
 

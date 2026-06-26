@@ -93,7 +93,7 @@ test('documents first release setup and platform dependencies', async () => {
   assert.match(platforms, /ssh/);
   assert.match(platforms, /scp/);
   assert.match(platforms, /tar/);
-  assert.match(platforms, /sha256sum|shasum/);
+  assert.match(platforms, /远端可运行 `sha256sum` 或 `shasum`/);
   assert.match(platforms, /sshpass/);
   assert.match(platforms, /brew install hudochenkov\/sshpass\/sshpass/);
   assert.match(platforms, /sudo apt-get install sshpass/);

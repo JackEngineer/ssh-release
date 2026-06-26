@@ -11,7 +11,7 @@
 已实现：
 
 - `ssh-release init`：生成 `ssh-release.config.ts` 配置模板。
-- `ssh-release doctor`：检查配置、本地源路径、SSH 连接、远程目录、远端锁和远端 `tar`。
+- `ssh-release doctor`：检查配置、本地源路径、本地命令、SSH 连接、远程目录、远端 hash、远端锁和远端 `tar`。
 - `ssh-release deploy`：发布本地文件或目录。
 - `ssh-release list`：查看远程版本和当前版本。
 - `ssh-release rollback [version]`：回滚到上一个版本或指定版本。
@@ -180,7 +180,9 @@ source files -> package -> upload -> release -> activate -> rollback
 ssh-release doctor
 ```
 
-`doctor` 会检查 `.ssh-release.lock`。没有锁时正常通过；如果发现锁，会以 `warn` 显示锁路径、pid、创建时间和安全清理提示。
+`doctor` 会先检查本地 `tar`、`ssh`、`scp`，使用密码登录时还会检查 `sshpass`。本地检查失败时不会继续连接远端。
+
+`doctor` 也会检查 `.ssh-release.lock`。没有锁时正常通过；如果发现锁，会以 `warn` 显示锁路径、pid、创建时间和安全清理提示。
 
 需要先查看发布计划但不修改服务器时：
 
@@ -362,10 +364,11 @@ export SSH_RELEASE_PASSWORD='your-password'
 - `tar`：本地打包发布内容。
 - `ssh`：执行远端目录、解压、软链接、列表和检查命令。
 - `scp`：上传压缩包和逐文件回退上传。
-- `sha256sum` 或 `shasum`：发布后校验远端 `manifest.json` hash。
 - `sshpass`：仅密码登录时需要；私钥登录不需要。
 
 在 macOS 上打包时会禁用 AppleDouble 和扩展属性元数据，避免把 `._*` 文件发布到 Linux 服务器。
+
+远端需要可运行 `sha256sum` 或 `shasum`，用于校验 `manifest.json` hash。
 
 远端 `tar` 是可选能力，不可用时会按配置回退逐文件上传。
 
@@ -491,6 +494,7 @@ docs/
 - 发布和回滚锁获取、释放和锁冲突拦截。
 - 发布 manifest 生成、上传和远端 hash 校验。
 - `doctor` 远端锁状态检查和安全清理提示。
+- `doctor` 本地命令和远端 hash 检查。
 - `unlock` 显式确认路径后删除远端锁。
 - 远端 `tar` 失败后的逐文件上传回退。
 - 远程版本列表读取和当前版本标记。

@@ -12,6 +12,7 @@ import type { SshReleaseConfig } from '../src/types.js';
 class FakeRemoteClient implements RemoteClient {
   commands: string[] = [];
   tarAvailable = true;
+  hashAvailable = true;
   lockInfo: { pid?: string; createdAt?: string } | undefined;
 
   async exec(command: string): Promise<{ stdout: string; stderr: string }> {
@@ -45,6 +46,14 @@ class FakeRemoteClient implements RemoteClient {
       }
 
       return { stdout: '/usr/bin/tar\n', stderr: '' };
+    }
+
+    if (command.includes('sha256sum') || command.includes('shasum')) {
+      if (!this.hashAvailable) {
+        throw new Error('remote hash command missing');
+      }
+
+      return { stdout: '/usr/bin/sha256sum\n', stderr: '' };
     }
 
     return { stdout: '', stderr: '' };
@@ -93,7 +102,10 @@ test('doctor reports config, source, ssh, remote path, and tar checks', async ()
   await writeFile(configPath, 'export default {};');
 
   const client = new FakeRemoteClient();
-  const report = await runDoctor(createConfig({ sourcePath }), client, { configPath });
+  const report = await runDoctor(createConfig({ sourcePath }), client, {
+    configPath,
+    localCommandExists: async () => true,
+  });
 
   assert.equal(report.ok, true);
   assert.deepEqual(
@@ -102,8 +114,12 @@ test('doctor reports config, source, ssh, remote path, and tar checks', async ()
       ['配置文件', 'pass'],
       ['配置字段', 'pass'],
       ['本地源路径', 'pass'],
+      ['本地 tar', 'pass'],
+      ['本地 ssh', 'pass'],
+      ['本地 scp', 'pass'],
       ['SSH 连接', 'pass'],
       ['远程目录', 'pass'],
+      ['远端 hash', 'pass'],
       ['远端锁', 'pass'],
       ['远端 tar', 'pass'],
     ],
@@ -113,6 +129,7 @@ test('doctor reports config, source, ssh, remote path, and tar checks', async ()
     '没有发现发布或回滚锁',
   );
   assert.ok(client.commands.some((command) => command.includes('command -v tar')));
+  assert.ok(client.commands.some((command) => command.includes('sha256sum')));
 });
 
 test('doctor warns when remote lock exists and prints safe cleanup guidance', async () => {
@@ -129,7 +146,10 @@ test('doctor warns when remote lock exists and prints safe cleanup guidance', as
     createdAt: '2026-06-25T13:20:00Z',
   };
 
-  const report = await runDoctor(createConfig({ sourcePath }), client, { configPath });
+  const report = await runDoctor(createConfig({ sourcePath }), client, {
+    configPath,
+    localCommandExists: async () => true,
+  });
   const lockCheck = report.checks.find((check) => check.name === '远端锁');
 
   assert.equal(report.ok, true);
@@ -151,10 +171,63 @@ test('doctor warns when remote tar is unavailable but still allows fallback', as
   const client = new FakeRemoteClient();
   client.tarAvailable = false;
 
-  const report = await runDoctor(createConfig({ sourcePath }), client, { configPath });
+  const report = await runDoctor(createConfig({ sourcePath }), client, {
+    configPath,
+    localCommandExists: async () => true,
+  });
 
   assert.equal(report.ok, true);
   assert.equal(report.checks.at(-1)?.status, 'warn');
+});
+
+test('doctor fails before remote checks when password auth needs missing sshpass', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'ssh-release-doctor-local-'));
+  const sourcePath = path.join(root, 'dist');
+  const configPath = path.join(root, 'ssh-release.config.ts');
+  await mkdir(sourcePath, { recursive: true });
+  await writeFile(path.join(sourcePath, 'index.html'), '<h1>ok</h1>');
+  await writeFile(configPath, 'export default {};');
+
+  const client = new FakeRemoteClient();
+  const report = await runDoctor(
+    createConfig({ sourcePath, password: 'secret-password', privateKeyPath: undefined }),
+    client,
+    {
+      configPath,
+      localCommandExists: async (command) => command !== 'sshpass',
+    },
+  );
+  const sshpassCheck = report.checks.find((check) => check.name === '本地 sshpass');
+
+  assert.equal(report.ok, false);
+  assert.equal(sshpassCheck?.status, 'fail');
+  assert.equal(
+    sshpassCheck?.message,
+    '本地 sshpass 不可用；密码登录需要安装 sshpass，或改用私钥登录',
+  );
+  assert.deepEqual(client.commands, []);
+});
+
+test('doctor fails when remote hash command is unavailable', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'ssh-release-doctor-hash-'));
+  const sourcePath = path.join(root, 'dist');
+  const configPath = path.join(root, 'ssh-release.config.ts');
+  await mkdir(sourcePath, { recursive: true });
+  await writeFile(path.join(sourcePath, 'index.html'), '<h1>ok</h1>');
+  await writeFile(configPath, 'export default {};');
+
+  const client = new FakeRemoteClient();
+  client.hashAvailable = false;
+
+  const report = await runDoctor(createConfig({ sourcePath }), client, {
+    configPath,
+    localCommandExists: async () => true,
+  });
+  const hashCheck = report.checks.find((check) => check.name === '远端 hash');
+
+  assert.equal(report.ok, false);
+  assert.equal(hashCheck?.status, 'fail');
+  assert.equal(hashCheck?.message, 'remote hash command missing');
 });
 
 test('doctor reports a missing config file without creating a remote client', async () => {
@@ -176,6 +249,8 @@ test('doctor reports a missing config file without creating a remote client', as
 
 function createConfig(overrides: {
   mode?: 'release' | 'overwrite';
+  password?: string;
+  privateKeyPath?: string;
   sourcePath?: string;
 } = {}): SshReleaseConfig {
   return {
@@ -187,7 +262,10 @@ function createConfig(overrides: {
       host: 'example.com',
       port: 22,
       username: 'deploy',
-      privateKeyPath: path.join(os.homedir(), '.ssh/id_rsa'),
+      privateKeyPath: 'privateKeyPath' in overrides
+        ? overrides.privateKeyPath
+        : path.join(os.homedir(), '.ssh/id_rsa'),
+      password: overrides.password,
     },
     target: {
       path: '/var/www/site',
