@@ -55,6 +55,9 @@ ssh-release --help
 ssh-release --version
 ```
 
+首次接入步骤见 [docs/quick-start.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/quick-start.md)。
+本机和 CI 依赖见 [docs/platform-requirements.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/platform-requirements.md)。
+
 ## 本地开发
 
 ```bash
@@ -366,6 +369,8 @@ export SSH_RELEASE_PASSWORD='your-password'
 
 远端 `tar` 是可选能力，不可用时会按配置回退逐文件上传。
 
+Windows、macOS、Linux 和 CI 的依赖差异见 [docs/platform-requirements.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/platform-requirements.md)。
+
 ## 开发命令
 
 ```bash
@@ -411,6 +416,10 @@ npm install -g "$PACK_DIR"/ssh-release-"$VERSION".tgz --prefix "$PACK_DIR/prefix
 GitHub Actions 发布模板见 [docs/github-actions.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/github-actions.md)。
 
 失败恢复指南见 [docs/recovery.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/recovery.md)。
+
+首次发布指南见 [docs/quick-start.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/quick-start.md)。
+
+平台依赖说明见 [docs/platform-requirements.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/platform-requirements.md)。
 
 版本变更见 [CHANGELOG.md](https://github.com/JackEngineer/ssh-release/blob/main/CHANGELOG.md)。
 
@@ -458,6 +467,8 @@ tests/
 docs/
 ├── contracts.md
 ├── github-actions.md
+├── platform-requirements.md
+├── quick-start.md
 ├── recovery.md
 ├── release-checklist.md
 └── superpowers/specs/2026-06-25-ssh-release-design.md

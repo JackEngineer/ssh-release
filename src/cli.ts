@@ -110,6 +110,7 @@ export async function runCli(
       }
 
       io.log(`已创建 ${parsed.configPath}`);
+      printInitNextSteps(parsed.configPath, io);
       return 0;
     }
 
@@ -493,6 +494,14 @@ function printUnlockResult(result: UnlockResult, io: CliIo): void {
   io.log(`ssh-release unlock --confirm ${result.lockPath}`);
 }
 
+function printInitNextSteps(configPath: string, io: CliIo): void {
+  io.log('下一步:');
+  io.log('1. 设置 SSH_RELEASE_HOST、SSH_RELEASE_USER，并选择密码或私钥认证。');
+  io.log('2. 确认 source.path 和 target.path 指向要发布的本地目录和远端目录。');
+  io.log(`3. 运行 ssh-release doctor --config ${configPath} 检查配置和服务器连接。`);
+  io.log(`4. 运行 ssh-release deploy --plan --config ${configPath} 预览发布计划。`);
+}
+
 function printJsonResult(command: string, result: unknown, exitCode: number, io: CliIo): void {
   io.log(JSON.stringify({
     ok: exitCode === 0,
@@ -577,6 +586,10 @@ function formatError(error: unknown): string {
 }
 
 function createErrorHint(command: string | undefined, error: string): string | undefined {
+  if (error.includes('配置文件不存在')) {
+    return '先运行 ssh-release init 生成配置文件，再填写 source.path、server 和 target.path 后执行 ssh-release doctor。';
+  }
+
   if (error.includes('远程已有发布任务正在运行') || error.includes('.ssh-release.lock')) {
     return '先运行 ssh-release unlock 查看远端锁，确认没有发布或回滚任务后再按提示删除锁。';
   }
@@ -605,6 +618,10 @@ function createErrorHint(command: string | undefined, error: string): string | u
     return '先运行 ssh-release list --json 和 ssh-release doctor --json，确认 current、版本目录、manifest 和远端锁状态。';
   }
 
+  if (error.includes('sshpass')) {
+    return '当前配置使用密码登录，本机需要安装 sshpass；macOS 可运行 brew install hudochenkov/sshpass/sshpass，Ubuntu/Debian 可运行 sudo apt-get install sshpass，Windows 和 CI 推荐改用私钥登录。';
+  }
+
   if (
     command
     && command !== 'init'
@@ -612,7 +629,6 @@ function createErrorHint(command: string | undefined, error: string): string | u
       error.includes('Permission denied')
       || error.includes('Connection timed out')
       || error.includes('Could not resolve hostname')
-      || error.includes('sshpass')
       || error.includes('SSH')
     )
   ) {

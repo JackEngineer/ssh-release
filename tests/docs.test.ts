@@ -70,3 +70,41 @@ test('documents stable CLI, JSON, config, and safety contracts for 1.0', async (
   assert.match(readme, /manifest\.json/);
   assert.match(readme, /docs\/contracts\.md/);
 });
+
+test('documents first release setup and platform dependencies', async () => {
+  const quickStart = await readFile(new URL('../docs/quick-start.md', import.meta.url), 'utf8');
+  const platforms = await readFile(
+    new URL('../docs/platform-requirements.md', import.meta.url),
+    'utf8',
+  );
+  const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');
+
+  assert.match(quickStart, /ssh-release init/);
+  assert.match(quickStart, /ssh-release doctor/);
+  assert.match(quickStart, /ssh-release deploy --plan/);
+  assert.match(quickStart, /ssh-release deploy --json --progress/);
+  assert.match(quickStart, /ssh-release rollback --plan/);
+  assert.match(quickStart, /SSH_RELEASE_HOST/);
+  assert.match(quickStart, /SSH_RELEASE_USER/);
+  assert.match(quickStart, /source\.path/);
+  assert.match(quickStart, /target\.path/);
+
+  assert.match(platforms, /Node\.js 20/);
+  assert.match(platforms, /ssh/);
+  assert.match(platforms, /scp/);
+  assert.match(platforms, /tar/);
+  assert.match(platforms, /sha256sum|shasum/);
+  assert.match(platforms, /sshpass/);
+  assert.match(platforms, /brew install hudochenkov\/sshpass\/sshpass/);
+  assert.match(platforms, /sudo apt-get install sshpass/);
+  assert.match(platforms, /Windows/);
+  assert.match(platforms, /私钥登录/);
+
+  assert.doesNotMatch(`${quickStart}\n${platforms}`, new RegExp([
+    ['47', '114', '97', '21'].join('\\.'),
+    ['xiao', 'mao', '1994'].join(''),
+    'npm_[A-Za-z0-9]{20,}',
+  ].join('|')));
+  assert.match(readme, /docs\/quick-start\.md/);
+  assert.match(readme, /docs\/platform-requirements\.md/);
+});
