@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0 - 2026-06-26
+
+### Added
+
+- 增加 `ssh-release rollback --json --progress`，回滚时按 NDJSON 输出 `lock`、`switch`、`cleanup`、`verify` 阶段状态。
+- 增强回滚后远端校验，成功结果会输出 `verified` 与 `verification`，确认目标版本目录、`current` 指向和远端锁清理状态。
+
 ## 1.2.0 - 2026-06-26
 
 ### Added

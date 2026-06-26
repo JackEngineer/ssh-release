@@ -10,9 +10,10 @@
 ssh-release doctor --json
 ssh-release deploy --json --progress
 ssh-release list --json
+ssh-release rollback --json --progress
 ```
 
-`--json --progress` 会输出每个发布阶段。最后一行如果是 `{ "ok": false }`，优先看 `error` 字段；如果发布成功，最终结果里的 `verified` 应为 `true`。
+`--json --progress` 会输出每个发布或回滚阶段。最后一行如果是 `{ "ok": false }`，优先看 `error` 字段；如果发布或回滚成功，最终结果里的 `verified` 应为 `true`。
 
 常见可恢复失败会额外给出下一步提示。普通命令输出显示 `下一步:`，JSON 输出使用 `hint` 字段。
 

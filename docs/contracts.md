@@ -16,6 +16,7 @@
 - `ssh-release rollback [version] [--config <path>]`
 - `ssh-release rollback [version] --dry-run [--config <path>]`
 - `ssh-release rollback [version] --plan [--config <path>]`
+- `ssh-release rollback [version] --json --progress [--config <path>]`
 - `ssh-release unlock [--confirm <lock-path>] [--config <path>]`
 - `ssh-release --help`
 - `ssh-release --version`
@@ -24,7 +25,7 @@
 
 - `--config <path>`：使用自定义配置文件。
 - `--json`：输出可机器解析的 JSON。
-- `--progress`：仅用于 `deploy --json --progress`，输出 NDJSON 阶段事件。
+- `--progress`：用于 `deploy --json --progress` 和 `rollback --json --progress`，输出 NDJSON 阶段事件。
 - `--dry-run`：生成计划预览，不执行发布或回滚修改。
 - `--plan`：计划预览别名，行为等同 `--dry-run`。
 - `--confirm <lock-path>`：显式确认要删除的远端锁路径。
@@ -62,7 +63,7 @@
 {"ok": false, "command": "unlock", "result": {"locked": true, "removed": false}}
 ```
 
-`deploy --json --progress` 使用 NDJSON。进度事件在最终结果前输出：
+`deploy --json --progress` 和 `rollback --json --progress` 使用 NDJSON。进度事件在最终结果前输出：
 
 ```json
 {"ok": true, "command": "deploy", "event": "progress", "stage": "package", "status": "start"}
@@ -72,11 +73,20 @@
 
 稳定阶段：
 
+`deploy`：
+
 - `source`
 - `lock`
 - `package`
 - `publish`
 - `cleanup`
+
+`rollback`：
+
+- `lock`
+- `switch`
+- `cleanup`
+- `verify`
 
 稳定状态：
 
@@ -98,6 +108,14 @@
 
 - `version`
 - `currentSymlink`
+
+`rollback` 成功结果包含：
+
+- `version`
+- `currentSymlink`
+- `warnings`
+- `verified`
+- `verification`
 
 `deploy --dry-run` 和 `deploy --plan` 结果包含：
 
@@ -152,7 +170,7 @@ server: {
 
 ## 发布后校验契约
 
-`deploy` 返回成功前会执行远端状态校验。
+`deploy` 和 `rollback` 返回成功前会执行远端状态校验。
 
 `release` 模式校验：
 
@@ -165,6 +183,12 @@ server: {
 
 - 目标目录存在。
 - `manifest.json` 已上传且远端 hash 与本地生成的清单 hash 一致。
+- 远端锁已清理。
+
+`rollback` 校验：
+
+- 目标版本目录存在。
+- `current` 已指向目标版本。
 - 远端锁已清理。
 
 校验失败时命令返回失败，不会输出成功结果。

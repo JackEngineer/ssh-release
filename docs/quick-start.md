@@ -107,7 +107,7 @@ ssh-release rollback --plan
 确认目标版本正确后再执行：
 
 ```bash
-ssh-release rollback
+ssh-release rollback --json --progress
 ```
 
 ## 5. CI/CD 接入顺序

@@ -18,11 +18,13 @@
 - `ssh-release unlock`：查看远端锁，并在显式确认锁路径后删除锁。
 - `--json`：输出单行 JSON，便于 CI/CD 解析。
 - `deploy --json --progress`：发布时输出 NDJSON 阶段进度，便于 CI/CD 展示实时状态。
+- `rollback --json --progress`：回滚时输出 NDJSON 阶段进度，便于 CI/CD 展示实时状态。
 - `deploy --plan`：不连接远端、不修改服务器，预览上传、切换、清理和校验计划。
 - `rollback --plan`：连接远端读取版本状态，但不修改服务器，预览回滚切换计划。
 - 失败下一步提示：常见锁、回滚目标、发布校验和 SSH 错误会提示下一步操作。
 - 发布 manifest：每次发布生成 `manifest.json`，记录版本、发布时间、本地来源、文件清单、文件大小和 SHA-256。
 - 发布后远端校验：确认版本目录或目标目录存在、`current` 已指向新版本、`manifest.json` hash 匹配、远端锁已清理。
+- 回滚后远端校验：确认目标版本目录存在、`current` 已指向目标版本、远端锁已清理。
 - `release` 模式：上传压缩包、远端解压、切换 `current`、清理旧版本。
 - `overwrite` 模式：直接覆盖发布到目标目录。
 - 远端 `tar` 解压失败时回退逐文件上传。
@@ -285,6 +287,7 @@ ssh-release deploy --json --progress
 ssh-release doctor --json
 ssh-release list --json
 ssh-release rollback --json
+ssh-release rollback --json --progress
 ssh-release unlock --json
 ```
 
@@ -300,10 +303,11 @@ ssh-release unlock --json
 {"ok":false,"command":"deploy","error":"错误信息"}
 ```
 
-发布时需要持续读取阶段状态，可以使用：
+发布或回滚时需要持续读取阶段状态，可以使用：
 
 ```bash
 ssh-release deploy --json --progress
+ssh-release rollback --json --progress
 ```
 
 该模式会按行输出 NDJSON。进度事件先输出，最终结果最后输出：
@@ -314,9 +318,11 @@ ssh-release deploy --json --progress
 {"ok":true,"command":"deploy","result":{"mode":"release","version":"20260625-153000","verified":true}}
 ```
 
-`stage` 可能是 `source`、`lock`、`package`、`publish`、`cleanup`，`status` 可能是 `start`、`success`、`fail`。失败事件会包含 `error` 字段。
+`deploy` 的 `stage` 可能是 `source`、`lock`、`package`、`publish`、`cleanup`。
+`rollback` 的 `stage` 可能是 `lock`、`switch`、`cleanup`、`verify`。
+`status` 可能是 `start`、`success`、`fail`。失败事件会包含 `error` 字段。
 
-发布结果中的 `verification` 会列出已通过的远端校验项：
+发布和回滚结果中的 `verification` 会列出已通过的远端校验项：
 
 ```json
 {"verified":true,"verification":[{"name":"发布清单","status":"pass","message":"manifest.json 已上传并校验，文件数 12"}]}
