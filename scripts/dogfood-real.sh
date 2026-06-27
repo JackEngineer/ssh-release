@@ -119,6 +119,8 @@ export default {
   },
   target: {
     path: '$TARGET',
+  },
+  deploy: {
     mode: 'release',
     keepReleases: 5,
   },

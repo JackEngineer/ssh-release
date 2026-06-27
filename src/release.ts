@@ -129,6 +129,28 @@ function pad(value: number): string {
   return value.toString().padStart(2, '0');
 }
 
+const maxVersionSuffixAttempts = 1000;
+
+export async function resolveUniqueReleaseVersion(
+  config: SshReleaseConfig,
+  client: RemoteClient,
+  baseVersionName: string,
+): Promise<string> {
+  const releasesPath = remoteJoin(config.target.path, config.target.releasesDir);
+
+  for (let attempt = 1; attempt <= maxVersionSuffixAttempts; attempt += 1) {
+    const candidate = attempt === 1 ? baseVersionName : `${baseVersionName}-${attempt}`;
+    const candidatePath = remoteJoin(releasesPath, candidate);
+    const result = await client.exec(`test -e ${shellQuote(candidatePath)} && echo exists || true`);
+
+    if (result.stdout.trim() !== 'exists') {
+      return candidate;
+    }
+  }
+
+  throw new Error(`无法为版本 ${baseVersionName} 生成唯一目录名，已尝试 ${maxVersionSuffixAttempts} 次`);
+}
+
 export async function deploy(
   config: SshReleaseConfig,
   client: RemoteClient,
@@ -137,9 +159,14 @@ export async function deploy(
   await withDeployProgress(options, 'source', () => ensureSourceExists(config.source.path));
 
   const releaseDate = options.now ?? new Date();
-  const versionName = createVersionName(releaseDate);
+  let versionName = createVersionName(releaseDate);
   const packageFactory = options.createPackage ?? createReleasePackage;
   const releaseLock = await withDeployProgress(options, 'lock', () => acquireRemoteLock(config, client));
+
+  if (config.deploy.mode === 'release') {
+    versionName = await resolveUniqueReleaseVersion(config, client, versionName);
+  }
+
   let releasePackage: ReleasePackage | undefined;
   let manifest: ReleaseManifest | undefined;
   let manifestFile: WrittenReleaseManifest | undefined;
