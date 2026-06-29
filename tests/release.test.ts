@@ -193,7 +193,8 @@ test('deploy uses a remote lock and releases it when packaging fails', async (t)
   assert.equal(client.uploads.length, 0);
   assert.equal(client.execCommands[0].includes('mkdir'), true);
   assert.equal(client.execCommands[0].includes('/var/www/site/.ssh-release.lock'), true);
-  assert.equal(client.execCommands.at(-1), "rm -rf '/var/www/site/.ssh-release.lock'");
+  assert.ok(client.execCommands.includes("rm -rf '/var/www/site/.ssh-release.lock'"));
+  assert.ok(client.execCommands.at(-1)?.includes("if [ -d '/var/www/site/.ssh-release.lock' ]"));
 });
 
 test('deploy stops before packaging when the remote lock exists', async (t) => {

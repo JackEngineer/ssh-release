@@ -11,7 +11,7 @@ import {
   type ReleaseManifest,
   type WrittenReleaseManifest,
 } from './manifest.js';
-import { acquireRemoteLock, readRemoteLockStatus } from './lock.js';
+import { acquireRemoteLock, readRemoteLockStatus, waitForRemoteLockReleased } from './lock.js';
 import {
   readRemoteReleaseNames,
   remoteJoin,
@@ -239,6 +239,7 @@ export async function deploy(
 
       try {
         await releaseLock();
+        await waitForRemoteLockReleased(config, client, { label: '发布锁' });
       } catch (error) {
         const message = `远程发布锁清理失败: ${formatError(error)}`;
 

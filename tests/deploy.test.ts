@@ -17,8 +17,10 @@ class FakeRemoteClient implements RemoteClient {
   currentVersion = '20260625-122000';
   failTar = false;
   lockExists = false;
+  delayedLockReleaseChecks = 0;
   keepStaleCurrent = false;
   existingReleaseDirs = new Set<string>();
+  private lockRemovalPending = false;
 
   async exec(command: string): Promise<{ stdout: string; stderr: string }> {
     this.commands.push(command);
@@ -33,10 +35,15 @@ class FakeRemoteClient implements RemoteClient {
 
     if (command.includes("mkdir '/var/www/site/.ssh-release.lock'")) {
       this.lockExists = true;
+      this.lockRemovalPending = false;
     }
 
     if (command.includes("rm -rf '/var/www/site/.ssh-release.lock'")) {
-      this.lockExists = false;
+      if (this.delayedLockReleaseChecks > 0) {
+        this.lockRemovalPending = true;
+      } else {
+        this.lockExists = false;
+      }
     }
 
     const symlinkMatch = command.match(/ln -sfn 'releases\/([^']+)' '\/var\/www\/site\/current'/);
@@ -49,6 +56,16 @@ class FakeRemoteClient implements RemoteClient {
     }
 
     if (command.includes("if [ -d '/var/www/site/.ssh-release.lock' ]")) {
+      if (this.lockRemovalPending && this.delayedLockReleaseChecks > 0) {
+        this.delayedLockReleaseChecks -= 1;
+        return { stdout: 'locked\npid=123\ncreated_at=2026-06-25T00:00:00Z\n', stderr: '' };
+      }
+
+      if (this.lockRemovalPending) {
+        this.lockRemovalPending = false;
+        this.lockExists = false;
+      }
+
       return { stdout: this.lockExists ? 'locked\npid=123\ncreated_at=2026-06-25T00:00:00Z\n' : 'unlocked\n', stderr: '' };
     }
 
@@ -237,6 +254,27 @@ test('verifies release target, current symlink, and lock cleanup after deploy', 
   assert.ok(client.commands.some((command) => command.includes("test -d '/var/www/site/releases/20260625-153000'")));
   assert.ok(client.commands.some((command) => command.includes("readlink '/var/www/site/current'")));
   assert.ok(client.commands.some((command) => command.includes("if [ -d '/var/www/site/.ssh-release.lock' ]")));
+});
+
+test('waits for deploy lock release before reporting cleanup success', async () => {
+  const { config, sourcePath } = await createConfig();
+  const client = new FakeRemoteClient();
+  client.delayedLockReleaseChecks = 1;
+
+  const result = await deploy(config, client, {
+    now: new Date('2026-06-25T15:30:00+08:00'),
+    createPackage: async () => ({
+      archivePath: path.join(sourcePath, 'release.tgz'),
+      cleanup: async () => {},
+    }),
+  });
+
+  assert.equal(result.verified, true);
+  assert.ok(result.verification?.some((check) => check.name === '远端锁'));
+  assert.equal(
+    client.commands.filter((command) => command.includes("if [ -d '/var/www/site/.ssh-release.lock' ]")).length >= 2,
+    true,
+  );
 });
 
 test('fails deploy when release verification sees a stale current symlink', async () => {
