@@ -1,6 +1,6 @@
 {
   "name": "ssh-release",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "A general-purpose SSH file release CLI.",
   "type": "module",
   "bin": {

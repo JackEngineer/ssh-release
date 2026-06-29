@@ -26,6 +26,10 @@ remote_exec() {
       -o StrictHostKeyChecking="$strict_host_key_checking" \
       -o PreferredAuthentications=password \
       -o PubkeyAuthentication=no \
+      -o NumberOfPasswordPrompts=1 \
+      -o ConnectTimeout=15 \
+      -o ServerAliveInterval=15 \
+      -o ServerAliveCountMax=2 \
       -p "$port" \
       "$remote" \
       "$@"
@@ -35,6 +39,9 @@ remote_exec() {
   if [ -n "${SSH_RELEASE_PRIVATE_KEY_PATH:-}" ]; then
     ssh \
       -o StrictHostKeyChecking="$strict_host_key_checking" \
+      -o ConnectTimeout=15 \
+      -o ServerAliveInterval=15 \
+      -o ServerAliveCountMax=2 \
       -i "$SSH_RELEASE_PRIVATE_KEY_PATH" \
       -p "$port" \
       "$remote" \
@@ -44,6 +51,9 @@ remote_exec() {
 
   ssh \
     -o StrictHostKeyChecking="$strict_host_key_checking" \
+    -o ConnectTimeout=15 \
+    -o ServerAliveInterval=15 \
+    -o ServerAliveCountMax=2 \
     -p "$port" \
     "$remote" \
     "$@"

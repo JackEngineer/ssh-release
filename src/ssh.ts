@@ -2,7 +2,7 @@ import { readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 
 import { isExcludedPath, toPosixPath } from './exclude.js';
-import { runProcess, type ProcessResult } from './process.js';
+import { runProcess, type ProcessResult, type RunProcessOptions } from './process.js';
 import { remoteJoin, shellQuote } from './remote.js';
 import type { SshReleaseConfig } from './types.js';
 
@@ -18,17 +18,53 @@ export interface ProcessSpec {
   env?: NodeJS.ProcessEnv;
 }
 
+type ProcessRetryOptions = NonNullable<RunProcessOptions['retry']>;
+
+const connectionStabilityOptions = [
+  '-o',
+  'ConnectTimeout=15',
+  '-o',
+  'ServerAliveInterval=15',
+  '-o',
+  'ServerAliveCountMax=2',
+];
+
+const passwordAuthOptions = [
+  '-o',
+  'StrictHostKeyChecking=accept-new',
+  '-o',
+  'PreferredAuthentications=password',
+  '-o',
+  'PubkeyAuthentication=no',
+  '-o',
+  'NumberOfPasswordPrompts=1',
+  ...connectionStabilityOptions,
+];
+
+const retryableSshErrorFragments = [
+  'connection closed',
+  'connection reset',
+  'connection refused',
+  'connection timed out',
+  'operation timed out',
+  'broken pipe',
+  'kex_exchange_identification',
+  'ssh_exchange_identification',
+  'banner exchange',
+  'client_loop: send disconnect',
+];
+
 export class ShellRemoteClient implements RemoteClient {
   constructor(private readonly server: SshReleaseConfig['server']) {}
 
   async exec(command: string): Promise<ProcessResult> {
     const spec = createSshProcessSpec(this.server, command);
-    return runProcess(spec.command, spec.args, { env: spec.env });
+    return runRemoteProcess(spec);
   }
 
   async uploadFile(localPath: string, remotePath: string): Promise<void> {
     const spec = createScpProcessSpec(this.server, localPath, remotePath);
-    await runProcess(spec.command, spec.args, { env: spec.env });
+    await runRemoteProcess(spec);
   }
 
   async uploadDirectory(localPath: string, remotePath: string, exclude: string[]): Promise<void> {
@@ -58,14 +94,7 @@ export function createSshProcessSpec(
         'ssh',
         '-p',
         String(server.port),
-        '-o',
-        'StrictHostKeyChecking=accept-new',
-        '-o',
-        'PreferredAuthentications=password',
-        '-o',
-        'PubkeyAuthentication=no',
-        '-o',
-        'NumberOfPasswordPrompts=1',
+        ...passwordAuthOptions,
         destination,
         remoteCommand,
       ],
@@ -84,6 +113,7 @@ export function createSshProcessSpec(
       requirePrivateKeyPath(server),
       '-o',
       'BatchMode=yes',
+      ...connectionStabilityOptions,
       destination,
       remoteCommand,
     ],
@@ -105,14 +135,7 @@ export function createScpProcessSpec(
         'scp',
         '-P',
         String(server.port),
-        '-o',
-        'StrictHostKeyChecking=accept-new',
-        '-o',
-        'PreferredAuthentications=password',
-        '-o',
-        'PubkeyAuthentication=no',
-        '-o',
-        'NumberOfPasswordPrompts=1',
+        ...passwordAuthOptions,
         localPath,
         createScpRemoteTarget(destination, remotePath),
       ],
@@ -131,10 +154,32 @@ export function createScpProcessSpec(
       requirePrivateKeyPath(server),
       '-o',
       'BatchMode=yes',
+      ...connectionStabilityOptions,
       localPath,
       createScpRemoteTarget(destination, remotePath),
     ],
   };
+}
+
+export function isRetryableSshProcessError(error: Error): boolean {
+  const message = error.message.toLowerCase();
+
+  return retryableSshErrorFragments.some((fragment) => message.includes(fragment));
+}
+
+function createRemoteProcessRetryOptions(): ProcessRetryOptions {
+  return {
+    attempts: 3,
+    delayMs: 250,
+    shouldRetry: isRetryableSshProcessError,
+  };
+}
+
+function runRemoteProcess(spec: ProcessSpec): Promise<ProcessResult> {
+  return runProcess(spec.command, spec.args, {
+    env: spec.env,
+    retry: createRemoteProcessRetryOptions(),
+  });
 }
 
 function requirePrivateKeyPath(server: SshReleaseConfig['server']): string {

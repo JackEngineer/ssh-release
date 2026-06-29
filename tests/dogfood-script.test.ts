@@ -23,6 +23,10 @@ test('provides a reusable real-server dogfood script without embedded secrets', 
   assert.match(script, /dogfood[^\\n]+ok/);
   assert.match(script, /SSH_RELEASE_KEEP_LOCAL_ON_FAILURE/);
   assert.match(script, /dogfood failed/);
+  assert.match(script, /NumberOfPasswordPrompts=1/);
+  assert.match(script, /ConnectTimeout=15/);
+  assert.match(script, /ServerAliveInterval=15/);
+  assert.match(script, /ServerAliveCountMax=2/);
   assert.doesNotMatch(script, sensitivePattern);
 });
 
@@ -46,6 +50,7 @@ test('documents safe real-server dogfood usage', async () => {
   assert.match(guide, /remote_cleanup=ok/);
   assert.match(guide, /SSH_RELEASE_KEEP_LOCAL_ON_FAILURE/);
   assert.match(guide, /不要使用生产路径/);
+  assert.match(guide, /传输类 SSH\/SCP 错误会自动重试/);
   assert.match(readme, /docs\/dogfood\.md/);
   assert.match(releaseChecklist, /docs\/dogfood\.md/);
   assert.doesNotMatch(`${guide}\n${readme}\n${releaseChecklist}`, sensitivePattern);

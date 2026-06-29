@@ -45,10 +45,10 @@ test('declares npm publish boundaries and verification hooks', async () => {
   assert.equal(packageJson.scripts?.prepublishOnly, 'npm run lint && npm test && npm run build');
 });
 
-test('prepares the next minor release version', async () => {
+test('prepares the next patch release version', async () => {
   const packageJson = JSON.parse(
     await readFile(new URL('../package.json', import.meta.url), 'utf8'),
   ) as PackageJson;
 
-  assert.equal(packageJson.version, '1.4.0');
+  assert.equal(packageJson.version, '1.4.1');
 });

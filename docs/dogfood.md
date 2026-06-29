@@ -45,6 +45,8 @@ export SSH_RELEASE_KEEP_LOCAL_ON_FAILURE=1
 
 使用密码登录时，本机需要安装 `sshpass`。私钥登录不需要 `sshpass`。`SSH_RELEASE_KEEP_LOCAL_ON_FAILURE` 默认为 `1`，失败时保留本地临时日志；设置为 `0` 可在失败后也删除本地日志。
 
+CLI 遇到传输类 SSH/SCP 错误会自动重试；脚本自身的清理连接也使用连接超时和保活参数，避免远端清理因为连接抖动长时间挂住。
+
 ## 验证内容
 
 `scripts/dogfood-real.sh` 会按顺序执行：

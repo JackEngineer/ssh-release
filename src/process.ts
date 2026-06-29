@@ -9,12 +9,50 @@ export interface RunProcessOptions {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   allowFailure?: boolean;
+  retry?: {
+    attempts: number;
+    delayMs?: number;
+    shouldRetry?: (error: Error, attempt: number) => boolean;
+  };
 }
 
 export async function runProcess(
   command: string,
   args: string[],
   options: RunProcessOptions = {},
+): Promise<ProcessResult> {
+  const maxAttempts = Math.max(1, options.retry?.attempts ?? 1);
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await runProcessOnce(command, args, options);
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error;
+      }
+
+      const canRetry = attempt < maxAttempts
+        && (options.retry?.shouldRetry?.(error, attempt) ?? Boolean(options.retry));
+
+      if (!canRetry) {
+        throw error;
+      }
+
+      const delayMs = options.retry?.delayMs ?? 0;
+
+      if (delayMs > 0) {
+        await wait(delayMs);
+      }
+    }
+  }
+
+  throw new Error(`${command} 执行失败`);
+}
+
+async function runProcessOnce(
+  command: string,
+  args: string[],
+  options: RunProcessOptions,
 ): Promise<ProcessResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
@@ -45,5 +83,11 @@ export async function runProcess(
 
       reject(new Error(`${command} 执行失败: ${result.stderr.trim() || `exit ${code}`}`));
     });
+  });
+}
+
+function wait(delayMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, delayMs);
   });
 }
