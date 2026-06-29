@@ -18,9 +18,18 @@ class FakeRemoteClient implements RemoteClient {
   failTar = false;
   lockExists = false;
   keepStaleCurrent = false;
+  existingReleaseDirs = new Set<string>();
 
   async exec(command: string): Promise<{ stdout: string; stderr: string }> {
     this.commands.push(command);
+
+    const existsMatch = command.match(/^test -e '([^']+)' && echo exists \|\| true$/);
+    if (existsMatch) {
+      return {
+        stdout: this.existingReleaseDirs.has(existsMatch[1]) ? 'exists\n' : '',
+        stderr: '',
+      };
+    }
 
     if (command.includes("mkdir '/var/www/site/.ssh-release.lock'")) {
       this.lockExists = true;
@@ -130,6 +139,25 @@ test('deploys release mode with package upload, tar extraction, symlink switch, 
   assert.ok(client.commands.some((command) => command.includes("tar -xzf '/var/www/site/.ssh-release-tmp/20260625-153000.tgz' -C '/var/www/site/releases/20260625-153000'")));
   assert.ok(client.commands.some((command) => command.includes("ln -sfn 'releases/20260625-153000' '/var/www/site/current'")));
   assert.ok(client.commands.some((command) => command.includes("rm -rf '/var/www/site/releases/20260625-120000'")));
+});
+
+test('appends a numeric suffix when the release directory already exists', async () => {
+  const { config, sourcePath } = await createConfig();
+  const client = new FakeRemoteClient();
+  client.existingReleaseDirs.add('/var/www/site/releases/20260625-153000');
+
+  const result = await deploy(config, client, {
+    now: new Date('2026-06-25T15:30:00+08:00'),
+    createPackage: async () => ({
+      archivePath: path.join(sourcePath, 'release.tgz'),
+      cleanup: async () => {},
+    }),
+  });
+
+  assert.equal(result.version, '20260625-153000-2');
+  assert.equal(result.targetPath, '/var/www/site/releases/20260625-153000-2');
+  assert.equal(result.manifest?.remotePath, '/var/www/site/releases/20260625-153000-2/manifest.json');
+  assert.ok(client.commands.some((command) => command.includes("ln -sfn 'releases/20260625-153000-2' '/var/www/site/current'")));
 });
 
 test('uploads a release manifest and verifies it after deploy', async () => {

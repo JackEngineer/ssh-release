@@ -3,6 +3,8 @@ import { mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promise
 import os from 'node:os';
 import path from 'node:path';
 
+import { isExcludedPath, toPosixPath } from './exclude.js';
+
 export interface ReleaseManifestFile {
   path: string;
   size: number;
@@ -91,7 +93,7 @@ async function collectDirectoryFiles(
   for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
     const relativePath = toPosixPath(path.join(relativeDirectory, entry.name));
 
-    if (isExcluded(relativePath, exclude)) {
+    if (isExcludedPath(relativePath, exclude)) {
       continue;
     }
 
@@ -121,32 +123,4 @@ async function createManifestFileEntry(
     size: content.byteLength,
     sha256: createHash('sha256').update(content).digest('hex'),
   };
-}
-
-function isExcluded(relativePath: string, exclude: string[]): boolean {
-  const normalizedPath = toPosixPath(relativePath);
-  const pathSegments = normalizedPath.split('/');
-
-  return exclude.some((pattern) => {
-    const normalizedPattern = toPosixPath(pattern);
-
-    if (!normalizedPattern.includes('/')) {
-      return pathSegments.includes(normalizedPattern);
-    }
-
-    return wildcardMatch(normalizedPath, normalizedPattern)
-      || wildcardMatch(`./${normalizedPath}`, normalizedPattern);
-  });
-}
-
-function wildcardMatch(value: string, pattern: string): boolean {
-  const escapedPattern = pattern
-    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    .replaceAll('*', '[^/]*');
-
-  return new RegExp(`^${escapedPattern}$`).test(value);
-}
-
-function toPosixPath(value: string): string {
-  return value.split(path.sep).join(path.posix.sep);
 }

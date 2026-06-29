@@ -4,7 +4,7 @@ import {
   remoteJoin,
   shellQuote,
 } from './remote.js';
-import { acquireRemoteLock, readRemoteLockStatus } from './lock.js';
+import { acquireRemoteLock, readRemoteLockStatus, waitForRemoteLockReleased } from './lock.js';
 import type { RemoteClient } from './ssh.js';
 import type { SshReleaseConfig } from './types.js';
 
@@ -197,12 +197,15 @@ export async function rollback(
     await withRollbackProgress(options, 'cleanup', async () => {
       try {
         await releaseLock();
+        await waitForRemoteLockReleased(config, client, { label: '回滚锁' });
       } catch (error) {
         const message = `远程回滚锁清理失败: ${formatError(error)}`;
 
         if (result) {
           result.warnings.push(message);
-        } else if (!rollbackError) {
+        }
+
+        if (!rollbackError) {
           cleanupError = error;
         }
       }

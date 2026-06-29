@@ -1,6 +1,7 @@
 import { readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 
+import { isExcludedPath, toPosixPath } from './exclude.js';
 import { runProcess, type ProcessResult } from './process.js';
 import { remoteJoin, shellQuote } from './remote.js';
 import type { SshReleaseConfig } from './types.js';
@@ -160,17 +161,20 @@ async function uploadDirectoryContents(
   await walkDirectory(client, localPath, remotePath, exclude);
 }
 
-async function walkDirectory(
+export async function walkDirectory(
   client: RemoteClient,
   localDirectory: string,
   remoteDirectory: string,
   exclude: string[],
+  relativeDirectory = '',
 ): Promise<void> {
   await client.exec(`mkdir -p ${shellQuote(remoteDirectory)}`);
   const entries = await readdir(localDirectory, { withFileTypes: true });
 
   for (const entry of entries) {
-    if (exclude.includes(entry.name)) {
+    const relativeEntryPath = toPosixPath(path.join(relativeDirectory, entry.name));
+
+    if (isExcludedPath(relativeEntryPath, exclude)) {
       continue;
     }
 
@@ -178,7 +182,7 @@ async function walkDirectory(
     const remoteEntryPath = remoteJoin(remoteDirectory, entry.name);
 
     if (entry.isDirectory()) {
-      await walkDirectory(client, localEntryPath, remoteEntryPath, exclude);
+      await walkDirectory(client, localEntryPath, remoteEntryPath, exclude, relativeEntryPath);
       continue;
     }
 

@@ -422,6 +422,8 @@ npm install -g "$PACK_DIR"/ssh-release-"$VERSION".tgz --prefix "$PACK_DIR/prefix
 
 完整发布步骤见 [docs/release-checklist.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/release-checklist.md)。
 
+真实服务器 dogfood 见 [docs/dogfood.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/dogfood.md)。
+
 GitHub Actions 发布模板见 [docs/github-actions.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/github-actions.md)。
 
 失败恢复指南见 [docs/recovery.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/recovery.md)。

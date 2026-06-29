@@ -32,6 +32,15 @@ npm publish --dry-run
 - tarball 内容只包含 `LICENSE`、`README.md`、`CHANGELOG.md`、`package.json` 和 `dist/`。
 - `package.json`、`README.md`、`CHANGELOG.md` 和 `dist/cli.js` 出现在 tarball 内容中。
 
+需要真实 SSH 链路验证时，按 [真实服务器 dogfood](./dogfood.md)（`docs/dogfood.md`）运行：
+
+```bash
+npm run build
+scripts/dogfood-real.sh
+```
+
+dogfood 只能使用一次性 `/tmp/ssh-release-dogfood-*` 目录。不要使用生产路径。
+
 ## 本地安装烟测
 
 用本地 tarball 验证 npm 安装后的真实命令入口：
