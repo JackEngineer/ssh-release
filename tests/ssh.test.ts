@@ -109,6 +109,20 @@ test('retries transient password ssh command failures before succeeding', async 
   });
 });
 
+test('does not retry plain password authentication failures', async () => {
+  await withFakeSshpass('Permission denied (publickey,password).', async (attemptsPath) => {
+    const client = new ShellRemoteClient({
+      host: 'example.com',
+      port: 22,
+      username: 'deploy',
+      password: 'secret-password',
+    });
+
+    await assert.rejects(() => client.exec('true'), /Permission denied/);
+    assert.equal(await readFile(attemptsPath, 'utf8'), '1');
+  }, { successAttempt: 0 });
+});
+
 test('retries transient password scp upload failures before succeeding', async () => {
   await withFakeSshpass('scp: Connection closed', async (attemptsPath) => {
     const client = new ShellRemoteClient({
@@ -127,12 +141,15 @@ test('retries transient password scp upload failures before succeeding', async (
 async function withFakeSshpass(
   errorMessage: string,
   callback: (attemptsPath: string) => Promise<void>,
+  options: { successAttempt?: number } = {},
 ): Promise<void> {
   const tempDirectory = await mkdtemp(path.join(tmpdir(), 'ssh-release-ssh-'));
   const attemptsPath = path.join(tempDirectory, 'attempts.txt');
   const sshpassPath = path.join(tempDirectory, 'sshpass');
   const previousPath = process.env.PATH;
+  const previousAttemptsPath = process.env.SSH_RELEASE_FAKE_ATTEMPTS;
   const previousErrorMessage = process.env.SSH_RELEASE_FAKE_SSH_ERROR;
+  const previousSuccessAttempt = process.env.SSH_RELEASE_FAKE_SUCCESS_ATTEMPT;
 
   await writeFile(sshpassPath, `#!/usr/bin/env node
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -149,7 +166,8 @@ const attempts = existsSync(attemptsPath)
 const nextAttempt = attempts + 1;
 writeFileSync(attemptsPath, String(nextAttempt));
 
-if (nextAttempt < 3) {
+const successAttempt = Number(process.env.SSH_RELEASE_FAKE_SUCCESS_ATTEMPT || '3');
+if (successAttempt === 0 || nextAttempt < successAttempt) {
   console.error(process.env.SSH_RELEASE_FAKE_SSH_ERROR || 'scp: Connection closed');
   process.exit(255);
 }
@@ -159,17 +177,29 @@ if (nextAttempt < 3) {
   process.env.PATH = `${tempDirectory}${path.delimiter}${previousPath ?? ''}`;
   process.env.SSH_RELEASE_FAKE_ATTEMPTS = attemptsPath;
   process.env.SSH_RELEASE_FAKE_SSH_ERROR = errorMessage;
+  process.env.SSH_RELEASE_FAKE_SUCCESS_ATTEMPT = String(options.successAttempt ?? 3);
 
   try {
     await callback(attemptsPath);
   } finally {
     process.env.PATH = previousPath;
-    delete process.env.SSH_RELEASE_FAKE_ATTEMPTS;
+
+    if (previousAttemptsPath === undefined) {
+      delete process.env.SSH_RELEASE_FAKE_ATTEMPTS;
+    } else {
+      process.env.SSH_RELEASE_FAKE_ATTEMPTS = previousAttemptsPath;
+    }
 
     if (previousErrorMessage === undefined) {
       delete process.env.SSH_RELEASE_FAKE_SSH_ERROR;
     } else {
       process.env.SSH_RELEASE_FAKE_SSH_ERROR = previousErrorMessage;
+    }
+
+    if (previousSuccessAttempt === undefined) {
+      delete process.env.SSH_RELEASE_FAKE_SUCCESS_ATTEMPT;
+    } else {
+      process.env.SSH_RELEASE_FAKE_SUCCESS_ATTEMPT = previousSuccessAttempt;
     }
 
     await rm(tempDirectory, { recursive: true, force: true });
