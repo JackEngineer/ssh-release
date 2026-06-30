@@ -1,0 +1,4 @@
+interface:
+  display_name: "发布 ssh-release"
+  short_description: "标准化本仓库的版本发布、npm 验证和 GitHub Release 收口。"
+  default_prompt: "按本仓库标准流程发布 ssh-release，并完成 npm、GitHub Actions、GitHub Release 和安装 smoke 验证。"
