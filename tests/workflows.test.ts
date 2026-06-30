@@ -35,6 +35,10 @@ test('publishes npm packages through trusted publishing without long-lived token
   assert.match(workflow, /npm install -g "ssh-release@\$PACKAGE_VERSION"/);
   assert.match(workflow, /ssh-release --version --json/);
   assert.doesNotMatch(workflow, /NODE_AUTH_TOKEN|NPM_TOKEN|secrets\./);
+  assert.match(ciWorkflow, /actions\/checkout@v6/);
+  assert.match(ciWorkflow, /actions\/setup-node@v6/);
+  assert.match(ciWorkflow, /node-version: '24'/);
+  assert.doesNotMatch(ciWorkflow, /actions\/checkout@v4|actions\/setup-node@v4|node-version: 20/);
   assert.match(ciWorkflow, /TZ: Asia\/Shanghai/);
   assert.match(ciWorkflow, /workflow_dispatch:/);
 

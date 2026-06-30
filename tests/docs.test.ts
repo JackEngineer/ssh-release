@@ -8,10 +8,14 @@ test('documents a GitHub Actions deployment workflow with safe secrets usage', a
 
   assert.match(guide, /ssh-release deploy --dry-run --json/);
   assert.match(guide, /ssh-release deploy --json --progress/);
+  assert.match(guide, /actions\/checkout@v6/);
+  assert.match(guide, /actions\/setup-node@v6/);
+  assert.match(guide, /node-version: '24'/);
   assert.match(guide, /SSH_RELEASE_HOST/);
   assert.match(guide, /SSH_RELEASE_USER/);
   assert.match(guide, /SSH_RELEASE_PASSWORD/);
   assert.match(guide, /environment: production/);
+  assert.doesNotMatch(guide, /actions\/checkout@v4|actions\/setup-node@v4|node-version: 20/);
   assert.doesNotMatch(guide, new RegExp([
     ['47', '114', '97', '21'].join('\\.'),
     ['xiao', 'mao', '1994'].join(''),
