@@ -1,0 +1,15 @@
+{
+  "name": "acme-marketing-site",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "release:doctor": "npx --yes ssh-release doctor",
+    "release:plan": "npx --yes ssh-release deploy --plan",
+    "release:deploy": "npx --yes ssh-release deploy --json --progress",
+    "release:rollback:plan": "npx --yes ssh-release rollback --plan",
+    "release:rollback": "npx --yes ssh-release rollback --json --progress"
+  }
+}

@@ -11,8 +11,11 @@
 
 ## 文件
 
+- `package.json`：业务仓库中的构建、发布和回滚命令入口。
 - `ssh-release.config.ts`：业务仓库根目录中的发布配置。
 - `.github/workflows/deploy.yml`：业务仓库中的发布 workflow。
+- `scripts/build.js`：示例构建脚本，把 `site/` 输出到 `dist/`。
+- `site/`：示例静态站点源码。
 
 ## 本地首次接入
 
@@ -25,21 +28,21 @@ export SSH_RELEASE_HOST=example.com
 export SSH_RELEASE_USER=deploy
 export SSH_RELEASE_PASSWORD='your-password'
 
-npx ssh-release doctor
-npx ssh-release deploy --plan
+npm run release:doctor
+npm run release:plan
 ```
 
 确认计划无误后再执行真实发布：
 
 ```bash
-npx ssh-release deploy --json --progress
+npm run release:deploy
 ```
 
 需要回滚时先预览，再执行：
 
 ```bash
-npx ssh-release rollback --plan
-npx ssh-release rollback --json --progress
+npm run release:rollback:plan
+npm run release:rollback
 ```
 
 ## CI 发布
@@ -53,9 +56,9 @@ npx ssh-release rollback --json --progress
 建议在 GitHub Environments 中创建 `production` 环境并开启人工审批。workflow 会按这个顺序执行：
 
 1. 安装依赖并构建 `dist/`。
-2. 运行 `npx ssh-release doctor --json` 检查服务器和远端目录。
-3. 运行 `npx ssh-release deploy --plan --json` 输出发布计划。
-4. 运行 `npx ssh-release deploy --json --progress` 执行发布。
+2. 运行 `npm run release:doctor -- --json` 检查服务器和远端目录。
+3. 运行 `npm run release:plan -- --json` 输出发布计划。
+4. 运行 `npm run release:deploy` 执行发布。
 
 ## 远端结果
 

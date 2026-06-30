@@ -25,21 +25,21 @@ jobs:
       - run: npm run build
 
       - name: Check remote environment
-        run: npx ssh-release doctor --json
+        run: npm run release:doctor -- --json
         env:
           SSH_RELEASE_HOST: ${{ secrets.SSH_RELEASE_HOST }}
           SSH_RELEASE_USER: ${{ secrets.SSH_RELEASE_USER }}
           SSH_RELEASE_PASSWORD: ${{ secrets.SSH_RELEASE_PASSWORD }}
 
       - name: Preview deploy plan
-        run: npx ssh-release deploy --plan --json
+        run: npm run release:plan -- --json
         env:
           SSH_RELEASE_HOST: ${{ secrets.SSH_RELEASE_HOST }}
           SSH_RELEASE_USER: ${{ secrets.SSH_RELEASE_USER }}
           SSH_RELEASE_PASSWORD: ${{ secrets.SSH_RELEASE_PASSWORD }}
 
       - name: Deploy files
-        run: npx ssh-release deploy --json --progress
+        run: npm run release:deploy
         env:
           SSH_RELEASE_HOST: ${{ secrets.SSH_RELEASE_HOST }}
           SSH_RELEASE_USER: ${{ secrets.SSH_RELEASE_USER }}
