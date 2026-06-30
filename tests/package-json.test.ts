@@ -44,6 +44,8 @@ test('declares npm publish boundaries and verification hooks', async () => {
   assert.equal(packageJson.homepage, 'https://github.com/JackEngineer/ssh-release#readme');
   assert.equal(packageJson.scripts?.prepack, 'npm run build');
   assert.equal(packageJson.scripts?.prepublishOnly, 'npm run lint && npm test && npm run build');
+  assert.equal(packageJson.scripts?.['release:preflight'], 'bash scripts/release-preflight.sh');
+  assert.equal(packageJson.scripts?.['release:postcheck'], 'bash scripts/release-postcheck.sh');
 });
 
 test('prepares the next minor release version', async () => {

@@ -19,11 +19,16 @@
 发布前运行：
 
 ```bash
-npm run prepublishOnly
-npm publish --dry-run
+npm run release:preflight
 ```
 
-`npm run prepublishOnly` 必须通过 lint、test 和 build。
+`npm run release:preflight` 会执行发布前可自动化的检查：
+
+- 检查当前分支、工作区状态、`package.json` 与 `package-lock.json` 版本一致。
+- 检查本地和远端不存在当前版本标签。
+- 运行 `npm run prepublishOnly`，必须通过 lint、test 和 build。
+- 运行 `npm publish --dry-run`，检查 npm tarball 内容。
+- 使用本地 tarball 做安装烟测，验证 `ssh-release --version`、`ssh-release --help` 和 `init --template static-site`。
 
 `npm publish --dry-run` 必须满足：
 
@@ -43,7 +48,7 @@ dogfood 只能使用一次性 `/tmp/ssh-release-dogfood-*` 目录。不要使用
 
 ## 本地安装烟测
 
-用本地 tarball 验证 npm 安装后的真实命令入口：
+`npm run release:preflight` 已包含本地 tarball 烟测。需要手工复现时使用：
 
 ```bash
 PACK_DIR=$(mktemp -d)
@@ -110,6 +115,8 @@ git push origin "v$VERSION"
 
 标签只应在确认版本号、提交范围和发布权限后创建。推送 `v*` 标签会触发 `.github/workflows/publish.yml`，workflow 会先校验标签版本和 `package.json` 版本一致，再执行 npm 发布。
 
+脚本不会自动创建 tag、推送 tag、执行 npm publish 或创建 GitHub Release。这些动作仍保留人工确认，避免误发版。
+
 ## 自动 npm 发布
 
 发布 workflow 必须满足：
@@ -124,11 +131,16 @@ git push origin "v$VERSION"
 发布完成后验证：
 
 ```bash
-npm view ssh-release version
-PACK_DIR=$(mktemp -d)
+npm run release:postcheck -- 1.5.0
+```
+
+`release:postcheck` 会检查 Publish workflow、npm registry 的当前版本和 `latest`、从 npm 安装当前版本并运行 CLI 烟测、确认 GitHub Release 已存在。
+
+如果 GitHub Release 尚未创建，确认 tag 已存在后执行：
+
+```bash
 VERSION=$(node -p "JSON.parse(require('fs').readFileSync('package.json', 'utf8')).version")
-npm install -g "ssh-release@$VERSION" --prefix "$PACK_DIR/prefix"
-"$PACK_DIR/prefix/bin/ssh-release"
+gh release create "v$VERSION" --verify-tag --title "v$VERSION" --notes-file /path/to/release-notes.md
 ```
 
 如果发布后发现问题，优先发布修复版本。只有在 npm 规则允许且影响范围明确时，才考虑撤销发布。

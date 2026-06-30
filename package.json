@@ -22,7 +22,9 @@
     "lint": "tsc --noEmit -p tsconfig.json",
     "test": "node --import tsx --test tests/*.test.ts",
     "prepack": "npm run build",
-    "prepublishOnly": "npm run lint && npm test && npm run build"
+    "prepublishOnly": "npm run lint && npm test && npm run build",
+    "release:preflight": "bash scripts/release-preflight.sh",
+    "release:postcheck": "bash scripts/release-postcheck.sh"
   },
   "keywords": [
     "ssh",

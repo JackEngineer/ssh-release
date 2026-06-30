@@ -25,6 +25,8 @@
 - `npm run lint`：检查格式和静态问题。
 - `npm run prepublishOnly`：发布前运行 lint、test 和 build。
 - `npm publish --dry-run`：检查 npm 发布包内容，不执行真实发布。
+- `npm run release:preflight`：发布前标准门禁，检查版本、工作区、标签、包内容和本地安装烟测。
+- `npm run release:postcheck -- <version>`：发布后标准验收，检查 GitHub Actions、npm latest、GitHub Release 和已发布包烟测。
 
 新增常用命令后，同步更新本文档。
 

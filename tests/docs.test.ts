@@ -119,3 +119,21 @@ test('documents first release setup and platform dependencies', async () => {
   assert.match(readme, /已发布到 npm/);
   assert.doesNotMatch(readme, /发布到 npm 后，可以在任意项目中全局安装/);
 });
+
+test('documents standardized release workflow scripts and manual release boundaries', async () => {
+  const checklist = await readFile(new URL('../docs/release-checklist.md', import.meta.url), 'utf8');
+  const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');
+
+  assert.match(checklist, /npm run release:preflight/);
+  assert.match(checklist, /npm run release:postcheck -- 1\.5\.0/);
+  assert.match(checklist, /git tag -a "v\$VERSION" -m "v\$VERSION"/);
+  assert.match(checklist, /gh release create "v\$VERSION" --verify-tag/);
+  assert.match(checklist, /脚本不会自动创建 tag、推送 tag、执行 npm publish 或创建 GitHub Release/);
+  assert.match(readme, /npm run release:preflight/);
+  assert.match(readme, /npm run release:postcheck -- <version>/);
+  assert.doesNotMatch(`${checklist}\n${readme}`, new RegExp([
+    ['47', '114', '97', '21'].join('\\.'),
+    ['xiao', 'mao', '1994'].join(''),
+    'npm_[A-Za-z0-9]{20,}',
+  ].join('|')));
+});

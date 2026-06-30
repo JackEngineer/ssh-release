@@ -427,8 +427,7 @@ npm run build
 发布前先运行完整校验：
 
 ```bash
-npm run prepublishOnly
-npm publish --dry-run
+npm run release:preflight
 ```
 
 需要验证 npm 安装后的真实命令入口时，可以使用本地 tarball 做烟测：
@@ -444,6 +443,12 @@ npm install -g "$PACK_DIR"/ssh-release-"$VERSION".tgz --prefix "$PACK_DIR/prefix
 
 `npm publish` 会发布到 npm registry，只有确认版本号、包内容、登录账号和发布权限都正确后再执行。
 当前仓库正式发布由 `.github/workflows/publish.yml` 执行：推送版本标签后，GitHub Actions 会校验标签版本、运行发布门禁、检查包内容并调用 `npm publish`。
+
+发布完成后运行：
+
+```bash
+npm run release:postcheck -- <version>
+```
 
 完整发布步骤见 [docs/release-checklist.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/release-checklist.md)。
 
