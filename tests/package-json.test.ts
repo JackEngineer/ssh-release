@@ -28,6 +28,7 @@ test('declares npm publish boundaries and verification hooks', async () => {
   });
   assert.deepEqual(packageJson.files, [
     'dist',
+    'examples',
     'README.md',
     'CHANGELOG.md',
     'LICENSE',
@@ -50,5 +51,5 @@ test('prepares the next patch release version', async () => {
     await readFile(new URL('../package.json', import.meta.url), 'utf8'),
   ) as PackageJson;
 
-  assert.equal(packageJson.version, '1.4.1');
+  assert.equal(packageJson.version, '1.4.2');
 });

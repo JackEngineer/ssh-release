@@ -16,7 +16,7 @@
 
 ```bash
 npm install -g ssh-release
-cp examples/static-site/ssh-release.config.ts ./ssh-release.config.ts
+curl -fsSL https://raw.githubusercontent.com/JackEngineer/ssh-release/main/examples/static-site/ssh-release.config.ts -o ssh-release.config.ts
 export SSH_RELEASE_HOST=example.com
 export SSH_RELEASE_USER=deploy
 export SSH_RELEASE_PASSWORD='your-password'

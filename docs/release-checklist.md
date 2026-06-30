@@ -29,8 +29,8 @@ npm publish --dry-run
 
 - 命令退出码为 `0`。
 - 没有 `npm auto-corrected` 之类的自动修正警告。
-- tarball 内容只包含 `LICENSE`、`README.md`、`CHANGELOG.md`、`package.json` 和 `dist/`。
-- `package.json`、`README.md`、`CHANGELOG.md` 和 `dist/cli.js` 出现在 tarball 内容中。
+- tarball 内容只包含 `LICENSE`、`README.md`、`CHANGELOG.md`、`package.json`、`dist/` 和 `examples/`。
+- `package.json`、`README.md`、`CHANGELOG.md`、`dist/cli.js` 和 `examples/static-site/ssh-release.config.ts` 出现在 tarball 内容中。
 
 需要真实 SSH 链路验证时，按 [真实服务器 dogfood](./dogfood.md)（`docs/dogfood.md`）运行：
 
