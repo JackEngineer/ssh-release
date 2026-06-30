@@ -4,6 +4,29 @@
 
 它只负责文件发布和版本切换，不负责构建项目、重启服务、修改 Nginx、操作容器或执行自定义远程脚本。
 
+## 3 分钟接入
+
+如果你第一次使用，先选一个最接近的示例复制：
+
+- [examples/static-site](https://github.com/JackEngineer/ssh-release/blob/main/examples/static-site)：发布 `./dist` 静态站点目录。
+- [examples/single-file](https://github.com/JackEngineer/ssh-release/blob/main/examples/single-file)：发布单个构建产物文件。
+- [examples/github-actions](https://github.com/JackEngineer/ssh-release/blob/main/examples/github-actions)：在 GitHub Actions 中发布到服务器。
+
+最小接入流程：
+
+```bash
+npm install -g ssh-release
+cp examples/static-site/ssh-release.config.ts ./ssh-release.config.ts
+export SSH_RELEASE_HOST=example.com
+export SSH_RELEASE_USER=deploy
+export SSH_RELEASE_PASSWORD='your-password'
+ssh-release doctor
+ssh-release deploy --plan
+ssh-release deploy --json --progress
+```
+
+`source.path` 指向已经构建好的文件或目录，`target.path` 指向远端目标目录。不要把真实服务器地址、密码、私钥或生产路径提交到仓库。
+
 ## 当前状态
 
 当前版本已进入 1.0 稳定版，CLI 命令、JSON 输出、配置字段和安全边界见 [docs/contracts.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/contracts.md)。
@@ -422,6 +445,8 @@ npm install -g "$PACK_DIR"/ssh-release-"$VERSION".tgz --prefix "$PACK_DIR/prefix
 
 完整发布步骤见 [docs/release-checklist.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/release-checklist.md)。
 
+可复制示例见 [examples/](https://github.com/JackEngineer/ssh-release/tree/main/examples)。
+
 真实服务器 dogfood 见 [docs/dogfood.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/dogfood.md)。
 
 GitHub Actions 发布模板见 [docs/github-actions.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/github-actions.md)。
@@ -459,16 +484,26 @@ src/
 ├── unlock.ts
 └── validate.ts
 
+examples/
+├── github-actions/
+├── single-file/
+└── static-site/
+
 tests/
 ├── cli.test.ts
 ├── config-load.test.ts
 ├── config-template.test.ts
 ├── deploy.test.ts
+├── docs.test.ts
+├── dogfood-script.test.ts
 ├── e2e.test.ts
+├── examples.test.ts
+├── exclude.test.ts
 ├── list-doctor.test.ts
 ├── manifest.test.ts
 ├── package-json.test.ts
 ├── package.test.ts
+├── process.test.ts
 ├── release.test.ts
 ├── rollback.test.ts
 ├── ssh.test.ts
