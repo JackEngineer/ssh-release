@@ -10,21 +10,21 @@
 npm install -g ssh-release
 ```
 
-如果要从最常见的静态站点发布配置开始，可以复制示例：
+如果要从最常见的静态站点发布配置开始，可以使用内置模板：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JackEngineer/ssh-release/main/examples/static-site/ssh-release.config.ts -o ssh-release.config.ts
+ssh-release init --template static-site
 ```
 
 完整示例见 [`examples/static-site`](../examples/static-site)、[`examples/single-file`](../examples/single-file) 和 [`examples/github-actions`](../examples/github-actions)。
 
-也可以从内置模板初始化：
+也可以生成通用默认模板：
 
 ```bash
 ssh-release init
 ```
 
-这会生成 `ssh-release.config.ts`。如果项目需要自定义文件名：
+这会生成 `ssh-release.config.ts`。发布单个构建产物文件时可使用 `ssh-release init --template single-file`。如果项目需要自定义文件名：
 
 ```bash
 ssh-release init --config deploy.config.ts

@@ -3,7 +3,14 @@ import { readFileSync, realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { CONFIG_FILE_NAME, loadConfigFile, writeConfigTemplate } from './config.js';
+import {
+  CONFIG_FILE_NAME,
+  isConfigTemplateName,
+  listConfigTemplateNames,
+  loadConfigFile,
+  writeConfigTemplate,
+  type ConfigTemplateName,
+} from './config.js';
 import { runDoctorFromFile, type DoctorReport } from './doctor.js';
 import { listReleases, type ListReleasesResult } from './list.js';
 import {
@@ -42,8 +49,12 @@ export interface UnlockCliOptions {
   confirmPath?: string;
 }
 
+export interface InitCliOptions {
+  templateName: ConfigTemplateName;
+}
+
 export interface CliHandlers {
-  init: () => Promise<void>;
+  init: (options?: InitCliOptions) => Promise<void>;
   deploy: (options?: DeployCliOptions) => Promise<DeployResult | DeployPlan>;
   rollback: (version?: string, options?: RollbackCliOptions) => Promise<RollbackResult | RollbackPlan>;
   list: () => Promise<ListReleasesResult>;
@@ -109,14 +120,20 @@ export async function runCli(
 
   try {
     if (command === 'init') {
-      await handlers.init();
+      await handlers.init({ templateName: parsed.templateName });
 
       if (parsed.json) {
-        printJsonResult('init', { configPath: parsed.configPath }, 0, io);
+        printJsonResult('init', {
+          configPath: parsed.configPath,
+          template: parsed.templateName,
+        }, 0, io);
         return 0;
       }
 
       io.log(`已创建 ${parsed.configPath}`);
+      if (parsed.templateName !== 'default') {
+        io.log(`已使用模板 ${parsed.templateName}`);
+      }
       printInitNextSteps(parsed.configPath, io);
       return 0;
     }
@@ -240,6 +257,7 @@ interface ParsedCliArgs {
   help: boolean;
   json: boolean;
   progress: boolean;
+  templateName: ConfigTemplateName;
   version: boolean;
 }
 
@@ -251,6 +269,7 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
   let help = false;
   let json = false;
   let progress = false;
+  let templateName: string | undefined;
   let version = false;
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -288,6 +307,18 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
       continue;
     }
 
+    if (arg === '--template') {
+      const value = argv[index + 1];
+
+      if (!value || value.startsWith('-')) {
+        return createParsedError('--template 需要配置模板名称', configPath, json);
+      }
+
+      templateName = value;
+      index += 1;
+      continue;
+    }
+
     if (arg === '--dry-run' || arg === '--plan') {
       dryRun = true;
       continue;
@@ -320,6 +351,24 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
     return createParsedError('--progress 仅支持 deploy 或 rollback 命令', configPath, json);
   }
 
+  if (templateName && args[0] !== 'init') {
+    return createParsedError('--template 仅支持 init 命令', configPath, json);
+  }
+
+  let selectedTemplateName: ConfigTemplateName = 'default';
+
+  if (templateName) {
+    if (!isConfigTemplateName(templateName)) {
+      return createParsedError(
+        `未知配置模板: ${templateName}。可用模板: ${listConfigTemplateNames().join(', ')}`,
+        configPath,
+        json,
+      );
+    }
+
+    selectedTemplateName = templateName;
+  }
+
   return {
     args: args.slice(1),
     command: args[0],
@@ -329,6 +378,7 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
     help,
     json,
     progress,
+    templateName: selectedTemplateName,
     version,
   };
 }
@@ -342,13 +392,14 @@ function createParsedError(error: string, configPath: string, json = false): Par
     help: false,
     json,
     progress: false,
+    templateName: 'default',
     version: false,
   };
 }
 
 function createDefaultHandlers(configPath: string): CliHandlers {
   return {
-    init: () => writeConfigTemplate(configPath),
+    init: (options) => writeConfigTemplate(configPath, options?.templateName),
     deploy: async (options) => {
       const config = await loadConfigFile(configPath);
 
@@ -586,7 +637,7 @@ function printUsage(io: CliIo): void {
 
 function createUsageText(): string {
   return `用法:
-  ssh-release init [--config <path>]
+  ssh-release init [--template default|single-file|static-site] [--config <path>]
   ssh-release doctor [--config <path>]
   ssh-release deploy [--config <path>]
   ssh-release deploy --dry-run [--config <path>]

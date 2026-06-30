@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.0 - 2026-06-30
+
+### Added
+
+- 增加 `ssh-release init --template static-site|single-file`，用内置模板生成常见发布配置。
+- 首次接入文档改用 `init --template static-site`，减少复制远程示例配置步骤。
+
 ## 1.4.2 - 2026-06-30
 
 ### Changed

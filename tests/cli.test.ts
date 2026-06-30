@@ -35,6 +35,7 @@ test('prints help and version without running command handlers', async () => {
     handlers,
   }), 0);
 
+  assert.equal(stdout.some((line) => line.includes('ssh-release init [--template default|single-file|static-site]')), true);
   assert.equal(stdout.some((line) => line.includes('ssh-release deploy --dry-run')), true);
   assert.equal(stdout.some((line) => line.includes('ssh-release deploy --plan')), true);
   assert.equal(stdout.some((line) => line.includes('ssh-release rollback [version] --dry-run')), true);
@@ -211,6 +212,40 @@ test('init writes a custom config path', async (t) => {
   assert.equal(stdout.includes('2. 确认 source.path 和 target.path 指向要发布的本地目录和远端目录。'), true);
   assert.equal(stdout.includes(`3. 运行 ssh-release doctor --config ${configPath} 检查配置和服务器连接。`), true);
   assert.equal(stdout.includes(`4. 运行 ssh-release deploy --plan --config ${configPath} 预览发布计划。`), true);
+});
+
+test('init writes a named config template', async (t) => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'ssh-release-template-'));
+  t.after(async () => {
+    await rm(tempDir, { force: true, recursive: true });
+  });
+  const configPath = join(tempDir, 'static-site.config.ts');
+  const stdout: string[] = [];
+
+  assert.equal(await runCli(['init', '--template', 'static-site', '--config', configPath], {
+    io: {
+      log: (message: string) => stdout.push(message),
+      error: () => undefined,
+    },
+  }), 0);
+
+  const content = await readFile(configPath, 'utf8');
+  assert.match(content, /path: '\.\/dist'/);
+  assert.match(content, /path: '\/var\/www\/example-static-site'/);
+  assert.equal(stdout.includes('已使用模板 static-site'), true);
+});
+
+test('init rejects unknown config templates', async () => {
+  const stderr: string[] = [];
+
+  assert.equal(await runCli(['init', '--template', 'unknown'], {
+    io: {
+      log: () => undefined,
+      error: (message: string) => stderr.push(message),
+    },
+  }), 1);
+
+  assert.equal(stderr.includes('未知配置模板: unknown。可用模板: default, single-file, static-site'), true);
 });
 
 test('passes dry-run option to deploy handler and prints deploy plan', async () => {

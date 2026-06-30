@@ -38,8 +38,9 @@ test('README exposes a short path to runnable examples', async () => {
   assert.match(readme, /examples\/static-site/);
   assert.match(readme, /examples\/single-file/);
   assert.match(readme, /examples\/github-actions/);
-  assert.match(readme, /raw\.githubusercontent\.com\/JackEngineer\/ssh-release\/main\/examples\/static-site\/ssh-release\.config\.ts/);
+  assert.match(readme, /ssh-release init --template static-site/);
   assert.doesNotMatch(readme, /^cp examples\/static-site\/ssh-release\.config\.ts/m);
+  assert.doesNotMatch(readme, /raw\.githubusercontent\.com\/JackEngineer\/ssh-release\/main\/examples\/static-site\/ssh-release\.config\.ts/);
 });
 
 test('example configs load with environment variables and stay inside safe placeholders', async () => {

@@ -6,7 +6,7 @@
 
 稳定命令：
 
-- `ssh-release init [--config <path>]`
+- `ssh-release init [--template default|single-file|static-site] [--config <path>]`
 - `ssh-release doctor [--config <path>]`
 - `ssh-release deploy [--config <path>]`
 - `ssh-release deploy --dry-run [--config <path>]`
@@ -24,6 +24,7 @@
 稳定选项：
 
 - `--config <path>`：使用自定义配置文件。
+- `--template default|single-file|static-site`：仅用于 `init`，选择要生成的配置模板。
 - `--json`：输出可机器解析的 JSON。
 - `--progress`：用于 `deploy --json --progress` 和 `rollback --json --progress`，输出 NDJSON 阶段事件。
 - `--dry-run`：生成计划预览，不执行发布或回滚修改。
@@ -43,6 +44,12 @@
 
 ```json
 {"ok": true, "command": "deploy", "result": {"mode": "release", "verified": true}}
+```
+
+`init --json` 成功结果包含生成的配置路径和模板名：
+
+```json
+{"ok": true, "command": "init", "result": {"configPath": "ssh-release.config.ts", "template": "static-site"}}
 ```
 
 失败结果：

@@ -49,6 +49,7 @@ test('documents stable CLI, JSON, config, and safety contracts for 1.0', async (
   const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');
 
   assert.match(guide, /1\.0\.0/);
+  assert.match(guide, /ssh-release init \[--template default\|single-file\|static-site\]/);
   assert.match(guide, /ssh-release deploy --json --progress/);
   assert.match(guide, /ssh-release rollback \[version\] --json --progress/);
   assert.match(guide, /ssh-release deploy --plan/);
@@ -85,9 +86,8 @@ test('documents first release setup and platform dependencies', async () => {
   );
   const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');
 
-  assert.match(quickStart, /ssh-release init/);
+  assert.match(quickStart, /ssh-release init --template static-site/);
   assert.match(quickStart, /examples\/static-site/);
-  assert.match(quickStart, /raw\.githubusercontent\.com\/JackEngineer\/ssh-release\/main\/examples\/static-site\/ssh-release\.config\.ts/);
   assert.match(quickStart, /ssh-release doctor/);
   assert.match(quickStart, /ssh-release deploy --plan/);
   assert.match(quickStart, /ssh-release deploy --json --progress/);
