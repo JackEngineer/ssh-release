@@ -7,6 +7,7 @@
 稳定命令：
 
 - `ssh-release init [--template default|single-file|static-site] [--config <path>]`
+- `ssh-release init --interactive [--config <path>]`
 - `ssh-release doctor [--config <path>]`
 - `ssh-release deploy [--config <path>]`
 - `ssh-release deploy --dry-run [--config <path>]`
@@ -25,6 +26,7 @@
 
 - `--config <path>`：使用自定义配置文件。
 - `--template default|single-file|static-site`：仅用于 `init`，选择要生成的配置模板。
+- `--interactive`：仅用于 `init`，按提示生成配置，可选择生成 GitHub Actions workflow；不能与 `--template` 或 `--json` 同时使用。
 - `--json`：输出可机器解析的 JSON。
 - `--progress`：用于 `deploy --json --progress` 和 `rollback --json --progress`，输出 NDJSON 阶段事件。
 - `--dry-run`：生成计划预览，不执行发布或回滚修改。

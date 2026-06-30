@@ -10,6 +10,14 @@ export const CONFIG_FILE_NAME = 'ssh-release.config.ts';
 export const CONFIG_TEMPLATE_NAMES = ['default', 'single-file', 'static-site'] as const;
 
 export type ConfigTemplateName = typeof CONFIG_TEMPLATE_NAMES[number];
+export type ConfigAuthMethod = 'password' | 'private-key';
+
+export interface CustomConfigTemplateOptions {
+  authMethod: ConfigAuthMethod;
+  privateKeyPath?: string;
+  sourcePath: string;
+  targetPath: string;
+}
 
 export function listConfigTemplateNames(): ConfigTemplateName[] {
   return [...CONFIG_TEMPLATE_NAMES];
@@ -118,11 +126,54 @@ export function createConfigTemplate(templateName: ConfigTemplateName = 'default
 `;
 }
 
+export function createCustomConfigTemplate(options: CustomConfigTemplateOptions): string {
+  const authBlock = options.authMethod === 'private-key'
+    ? `    privateKeyPath: process.env.SSH_RELEASE_PRIVATE_KEY_PATH || ${quoteConfigString(options.privateKeyPath ?? '~/.ssh/id_rsa')},`
+    : '    password: process.env.SSH_RELEASE_PASSWORD,';
+
+  return `export default {
+  source: {
+    path: ${quoteConfigString(options.sourcePath)},
+    exclude: ['.DS_Store', 'node_modules'],
+  },
+
+  server: {
+    host: process.env.SSH_RELEASE_HOST,
+    port: Number(process.env.SSH_RELEASE_PORT || 22),
+    username: process.env.SSH_RELEASE_USER,
+${authBlock}
+  },
+
+  target: {
+    path: ${quoteConfigString(options.targetPath)},
+    currentSymlink: 'current',
+    releasesDir: 'releases',
+    tempDir: '.ssh-release-tmp',
+  },
+
+  deploy: {
+    mode: 'release',
+    keepReleases: 5,
+    compression: 'tgz',
+    preferTar: true,
+    fallbackToFileUpload: true,
+  },
+};
+`;
+}
+
 export async function writeConfigTemplate(
   configPath = CONFIG_FILE_NAME,
   templateName: ConfigTemplateName = 'default',
 ): Promise<void> {
   await writeFile(configPath, createConfigTemplate(templateName), { flag: 'wx' });
+}
+
+export async function writeCustomConfigTemplate(
+  configPath = CONFIG_FILE_NAME,
+  options: CustomConfigTemplateOptions,
+): Promise<void> {
+  await writeFile(configPath, createCustomConfigTemplate(options), { flag: 'wx' });
 }
 
 export async function loadConfigFile(configPath = CONFIG_FILE_NAME): Promise<SshReleaseConfig> {
@@ -168,4 +219,8 @@ async function loadConfigInput(configPath: string): Promise<SshReleaseConfigInpu
 
   const factory = new Function('process', transformed);
   return factory(process) as SshReleaseConfigInput;
+}
+
+function quoteConfigString(value: string): string {
+  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 }

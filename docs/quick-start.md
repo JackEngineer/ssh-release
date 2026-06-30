@@ -10,7 +10,13 @@
 npm install -g ssh-release
 ```
 
-如果要从最常见的静态站点发布配置开始，可以使用内置模板：
+推荐先使用交互式初始化。它会询问发布内容类型、本地产物路径、远端目标目录、认证方式，并可选择生成 GitHub Actions 发布 workflow：
+
+```bash
+ssh-release init --interactive
+```
+
+如果要从最常见的静态站点发布配置开始，也可以使用内置模板：
 
 ```bash
 ssh-release init --template static-site

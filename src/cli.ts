@@ -1,13 +1,17 @@
 #!/usr/bin/env node
 import { readFileSync, realpathSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { access, mkdir, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 
 import {
   CONFIG_FILE_NAME,
+  type ConfigAuthMethod,
   isConfigTemplateName,
   listConfigTemplateNames,
   loadConfigFile,
+  writeCustomConfigTemplate,
   writeConfigTemplate,
   type ConfigTemplateName,
 } from './config.js';
@@ -29,10 +33,16 @@ import {
 } from './rollback.js';
 import { createRemoteClient } from './ssh.js';
 import { unlock, type UnlockResult } from './unlock.js';
+import { validateTargetPath } from './validate.js';
+
+const GITHUB_ACTIONS_WORKFLOW_PATH = '.github/workflows/ssh-release-deploy.yml';
+
+type PromptFn = (question: string) => Promise<string>;
 
 export interface CliIo {
   log: (message: string) => void;
   error: (message: string) => void;
+  prompt?: PromptFn;
 }
 
 export interface DeployCliOptions {
@@ -50,11 +60,18 @@ export interface UnlockCliOptions {
 }
 
 export interface InitCliOptions {
+  interactive: boolean;
+  log?: (message: string) => void;
+  prompt?: PromptFn;
   templateName: ConfigTemplateName;
 }
 
+export interface InitCliResult {
+  workflowPath?: string;
+}
+
 export interface CliHandlers {
-  init: (options?: InitCliOptions) => Promise<void>;
+  init: (options?: InitCliOptions) => Promise<void | InitCliResult>;
   deploy: (options?: DeployCliOptions) => Promise<DeployResult | DeployPlan>;
   rollback: (version?: string, options?: RollbackCliOptions) => Promise<RollbackResult | RollbackPlan>;
   list: () => Promise<ListReleasesResult>;
@@ -79,7 +96,7 @@ export async function runCli(
   argv = process.argv.slice(2),
   options: RunCliOptions = {},
 ): Promise<number> {
-  const io = options.io ?? console;
+  const io: CliIo = options.io ?? console;
   const parsed = parseCliArgs(argv);
 
   if (parsed.error) {
@@ -120,7 +137,12 @@ export async function runCli(
 
   try {
     if (command === 'init') {
-      await handlers.init({ templateName: parsed.templateName });
+      const initResult = await handlers.init({
+        interactive: parsed.interactive,
+        log: io.log,
+        prompt: io.prompt,
+        templateName: parsed.templateName,
+      });
 
       if (parsed.json) {
         printJsonResult('init', {
@@ -131,8 +153,17 @@ export async function runCli(
       }
 
       io.log(`已创建 ${parsed.configPath}`);
-      if (parsed.templateName !== 'default') {
+      if (parsed.interactive) {
+        io.log('已完成交互式初始化');
+      } else if (parsed.templateName !== 'default') {
         io.log(`已使用模板 ${parsed.templateName}`);
+      }
+      const workflowPath = initResult && 'workflowPath' in initResult
+        ? initResult.workflowPath
+        : undefined;
+
+      if (workflowPath) {
+        io.log(`已创建 ${workflowPath}`);
       }
       printInitNextSteps(parsed.configPath, io);
       return 0;
@@ -255,6 +286,7 @@ interface ParsedCliArgs {
   dryRun: boolean;
   error?: string;
   help: boolean;
+  interactive: boolean;
   json: boolean;
   progress: boolean;
   templateName: ConfigTemplateName;
@@ -267,6 +299,7 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
   let configPath = CONFIG_FILE_NAME;
   let dryRun = false;
   let help = false;
+  let interactive = false;
   let json = false;
   let progress = false;
   let templateName: string | undefined;
@@ -287,6 +320,11 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
 
     if (arg === '--json') {
       json = true;
+      continue;
+    }
+
+    if (arg === '--interactive' || arg === '-i') {
+      interactive = true;
       continue;
     }
 
@@ -355,6 +393,18 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
     return createParsedError('--template 仅支持 init 命令', configPath, json);
   }
 
+  if (interactive && args[0] !== 'init') {
+    return createParsedError('--interactive 仅支持 init 命令', configPath, json);
+  }
+
+  if (interactive && templateName) {
+    return createParsedError('--interactive 不能配合 --template 使用', configPath, json);
+  }
+
+  if (interactive && json) {
+    return createParsedError('--interactive 不能配合 --json 使用', configPath, json);
+  }
+
   let selectedTemplateName: ConfigTemplateName = 'default';
 
   if (templateName) {
@@ -376,6 +426,7 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
     configPath,
     dryRun,
     help,
+    interactive,
     json,
     progress,
     templateName: selectedTemplateName,
@@ -390,6 +441,7 @@ function createParsedError(error: string, configPath: string, json = false): Par
     dryRun: false,
     error,
     help: false,
+    interactive: false,
     json,
     progress: false,
     templateName: 'default',
@@ -399,7 +451,14 @@ function createParsedError(error: string, configPath: string, json = false): Par
 
 function createDefaultHandlers(configPath: string): CliHandlers {
   return {
-    init: (options) => writeConfigTemplate(configPath, options?.templateName),
+    init: async (options) => {
+      if (options?.interactive) {
+        return runInteractiveInit(configPath, options);
+      }
+
+      await writeConfigTemplate(configPath, options?.templateName);
+      return undefined;
+    },
     deploy: async (options) => {
       const config = await loadConfigFile(configPath);
 
@@ -434,6 +493,289 @@ function createDefaultHandlers(configPath: string): CliHandlers {
       return unlock(config, createRemoteClient(config), options);
     },
   };
+}
+
+interface InteractiveInitAnswers {
+  authMethod: ConfigAuthMethod;
+  generateWorkflow: boolean;
+  privateKeyPath?: string;
+  sourcePath: string;
+  targetPath: string;
+}
+
+async function runInteractiveInit(
+  configPath: string,
+  options: InitCliOptions,
+): Promise<InitCliResult> {
+  return withPrompt(options.prompt, async (prompt) => {
+    const answers = await collectInteractiveInitAnswers(prompt, options.log ?? (() => undefined));
+
+    await assertInteractiveInitOutputsAvailable(configPath, answers.generateWorkflow);
+
+    await writeCustomConfigTemplate(configPath, {
+      authMethod: answers.authMethod,
+      privateKeyPath: answers.privateKeyPath,
+      sourcePath: answers.sourcePath,
+      targetPath: answers.targetPath,
+    });
+
+    if (!answers.generateWorkflow) {
+      return {};
+    }
+
+    await mkdir(dirname(GITHUB_ACTIONS_WORKFLOW_PATH), { recursive: true });
+    await writeFile(
+      GITHUB_ACTIONS_WORKFLOW_PATH,
+      createGitHubActionsWorkflow(answers.authMethod),
+      { flag: 'wx' },
+    );
+
+    return {
+      workflowPath: GITHUB_ACTIONS_WORKFLOW_PATH,
+    };
+  });
+}
+
+async function assertInteractiveInitOutputsAvailable(
+  configPath: string,
+  generateWorkflow: boolean,
+): Promise<void> {
+  await assertFileDoesNotExist(configPath, '配置文件');
+
+  if (generateWorkflow) {
+    await assertFileDoesNotExist(GITHUB_ACTIONS_WORKFLOW_PATH, 'GitHub Actions workflow');
+  }
+}
+
+async function assertFileDoesNotExist(filePath: string, label: string): Promise<void> {
+  try {
+    await access(filePath);
+  } catch (error) {
+    const code = typeof error === 'object' && error !== null && 'code' in error
+      ? (error as { code?: unknown }).code
+      : undefined;
+
+    if (code === 'ENOENT') {
+      return;
+    }
+
+    throw error;
+  }
+
+  throw new Error(`${label} 已存在: ${filePath}。请删除或改名后重试。`);
+}
+
+async function withPrompt<T>(
+  injectedPrompt: PromptFn | undefined,
+  run: (prompt: PromptFn) => Promise<T>,
+): Promise<T> {
+  if (injectedPrompt) {
+    return run(injectedPrompt);
+  }
+
+  if (!process.stdin.isTTY) {
+    const answers = await readPromptLinesFromStdin();
+
+    return run(async (question) => {
+      process.stdout.write(question);
+
+      const answer = answers.shift();
+
+      if (answer === undefined) {
+        throw new Error('交互式输入不足，请重新运行 ssh-release init --interactive 并回答全部问题。');
+      }
+
+      return answer;
+    });
+  }
+
+  const readline = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  try {
+    return await run((question) => readline.question(question));
+  } finally {
+    readline.close();
+  }
+}
+
+async function readPromptLinesFromStdin(): Promise<string[]> {
+  const chunks: Buffer[] = [];
+
+  for await (const chunk of process.stdin) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+
+  return Buffer.concat(chunks).toString('utf8').split(/\r?\n/);
+}
+
+async function collectInteractiveInitAnswers(
+  prompt: PromptFn,
+  log: (message: string) => void,
+): Promise<InteractiveInitAnswers> {
+  const releaseShape = await askChoice(
+    prompt,
+    log,
+    '发布内容类型 (static-site/single-file) [static-site]: ',
+    ['static-site', 'single-file'],
+    'static-site',
+  );
+  const defaultSourcePath = releaseShape === 'single-file' ? './dist/app.tar.gz' : './dist';
+  const sourcePath = await askText(prompt, '本地产物路径', defaultSourcePath);
+  const targetPath = await askTargetPath(prompt, log, '/var/www/my-app');
+  const authMethod = await askChoice(
+    prompt,
+    log,
+    '认证方式 (password/private-key) [password]: ',
+    ['password', 'private-key'],
+    'password',
+  );
+  const privateKeyPath = authMethod === 'private-key'
+    ? await askText(prompt, '私钥路径', '~/.ssh/id_rsa')
+    : undefined;
+  const generateWorkflow = await askYesNo(prompt, log, '是否生成 GitHub Actions 发布 workflow? (y/N): ', false);
+
+  return {
+    authMethod,
+    generateWorkflow,
+    privateKeyPath,
+    sourcePath,
+    targetPath,
+  };
+}
+
+async function askChoice<T extends string>(
+  prompt: PromptFn,
+  log: (message: string) => void,
+  question: string,
+  choices: readonly T[],
+  defaultValue: T,
+): Promise<T> {
+  for (;;) {
+    const answer = normalizeChoiceAnswer(await prompt(question)) || defaultValue;
+    const selected = choices.find((choice) => choice === answer);
+
+    if (selected) {
+      return selected;
+    }
+
+    log(`请输入: ${choices.join(' / ')}`);
+  }
+}
+
+async function askText(prompt: PromptFn, label: string, defaultValue: string): Promise<string> {
+  const answer = trimAnswer(await prompt(`${label} [${defaultValue}]: `));
+  return answer || defaultValue;
+}
+
+async function askTargetPath(
+  prompt: PromptFn,
+  log: (message: string) => void,
+  defaultValue: string,
+): Promise<string> {
+  for (;;) {
+    const answer = await askText(prompt, '远端目标目录', defaultValue);
+
+    try {
+      return validateTargetPath(answer);
+    } catch (error) {
+      log(`target.path 无效: ${formatError(error)}`);
+    }
+  }
+}
+
+async function askYesNo(
+  prompt: PromptFn,
+  log: (message: string) => void,
+  question: string,
+  defaultValue: boolean,
+): Promise<boolean> {
+  for (;;) {
+    const answer = normalizeChoiceAnswer(await prompt(question));
+
+    if (!answer) {
+      return defaultValue;
+    }
+
+    if (['y', 'yes', '是'].includes(answer)) {
+      return true;
+    }
+
+    if (['n', 'no', '否'].includes(answer)) {
+      return false;
+    }
+
+    log('请输入 y 或 n');
+  }
+}
+
+function trimAnswer(answer: string): string {
+  return answer.trim();
+}
+
+function normalizeChoiceAnswer(answer: string): string {
+  return answer.trim().toLowerCase();
+}
+
+function createGitHubActionsWorkflow(authMethod: ConfigAuthMethod): string {
+  const secret = (name: string) => `\${{ secrets.${name} }}`;
+  const authSetup = authMethod === 'private-key'
+    ? `
+      - name: Write SSH private key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\\n' "$SSH_RELEASE_PRIVATE_KEY" > ~/.ssh/ssh-release
+          chmod 600 ~/.ssh/ssh-release
+        env:
+          SSH_RELEASE_PRIVATE_KEY: ${secret('SSH_RELEASE_PRIVATE_KEY')}
+`
+    : '';
+  const authEnv = authMethod === 'private-key'
+    ? `          SSH_RELEASE_PRIVATE_KEY_PATH: ~/.ssh/ssh-release`
+    : `          SSH_RELEASE_PASSWORD: ${secret('SSH_RELEASE_PASSWORD')}`;
+
+  return `name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+${authSetup}
+      - name: Check remote environment
+        run: npx ssh-release doctor --json
+        env:
+          SSH_RELEASE_HOST: ${secret('SSH_RELEASE_HOST')}
+          SSH_RELEASE_USER: ${secret('SSH_RELEASE_USER')}
+${authEnv}
+
+      - name: Deploy files
+        run: npx ssh-release deploy --json --progress
+        env:
+          SSH_RELEASE_HOST: ${secret('SSH_RELEASE_HOST')}
+          SSH_RELEASE_USER: ${secret('SSH_RELEASE_USER')}
+${authEnv}
+`;
 }
 
 function printDeployResult(result: DeployResult | DeployPlan, io: CliIo): void {
@@ -646,6 +988,7 @@ function printUsage(io: CliIo): void {
 function createUsageText(): string {
   return `用法:
   ssh-release init [--template default|single-file|static-site] [--config <path>]
+  ssh-release init --interactive [--config <path>]
   ssh-release doctor [--config <path>]
   ssh-release deploy [--config <path>]
   ssh-release deploy --dry-run [--config <path>]

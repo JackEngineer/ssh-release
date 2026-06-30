@@ -75,11 +75,15 @@ test('GitHub Actions example keeps deploy credentials in secrets', async () => {
   );
 
   assert.match(workflow, /environment: production/);
+  assert.match(workflow, /actions\/checkout@v6/);
+  assert.match(workflow, /actions\/setup-node@v6/);
+  assert.match(workflow, /node-version: '24'/);
   assert.match(workflow, /npx ssh-release doctor --json/);
   assert.match(workflow, /npx ssh-release deploy --json --progress/);
   assert.match(workflow, /secrets\.SSH_RELEASE_HOST/);
   assert.match(workflow, /secrets\.SSH_RELEASE_USER/);
   assert.match(workflow, /secrets\.SSH_RELEASE_PASSWORD/);
+  assert.doesNotMatch(workflow, /actions\/checkout@v4|actions\/setup-node@v4|node-version: 20/);
   assert.doesNotMatch(workflow, sensitivePattern);
 });
 

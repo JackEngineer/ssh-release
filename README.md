@@ -6,7 +6,7 @@
 
 ## 3 分钟接入
 
-如果你第一次使用，先用内置模板生成配置；需要对照完整配置时再看示例：
+如果你第一次使用，先用交互式初始化生成配置；需要对照完整配置时再看示例：
 
 - [examples/static-site](https://github.com/JackEngineer/ssh-release/blob/main/examples/static-site)：发布 `./dist` 静态站点目录。
 - [examples/single-file](https://github.com/JackEngineer/ssh-release/blob/main/examples/single-file)：发布单个构建产物文件。
@@ -16,7 +16,7 @@
 
 ```bash
 npm install -g ssh-release
-ssh-release init --template static-site
+ssh-release init --interactive
 export SSH_RELEASE_HOST=example.com
 export SSH_RELEASE_USER=deploy
 export SSH_RELEASE_PASSWORD='your-password'
@@ -25,7 +25,7 @@ ssh-release deploy --plan
 ssh-release deploy --json --progress
 ```
 
-`source.path` 指向已经构建好的文件或目录，`target.path` 指向远端目标目录。不要把真实服务器地址、密码、私钥或生产路径提交到仓库。
+`init --interactive` 会询问本地产物路径、远端目标目录、认证方式，并可选择生成 GitHub Actions 发布 workflow。`source.path` 指向已经构建好的文件或目录，`target.path` 指向远端目标目录。不要把真实服务器地址、密码、私钥或生产路径提交到仓库。
 
 ## 当前状态
 
@@ -33,7 +33,7 @@ ssh-release deploy --json --progress
 
 已实现：
 
-- `ssh-release init`：生成 `ssh-release.config.ts` 配置模板，支持 `--template static-site|single-file`。
+- `ssh-release init`：生成 `ssh-release.config.ts` 配置模板，支持 `--interactive` 和 `--template static-site|single-file`。
 - `ssh-release doctor`：检查配置、本地源路径、本地命令、SSH 连接、远程目录、远端 hash、远端锁和远端 `tar`。
 - `ssh-release deploy`：发布本地文件或目录。
 - `ssh-release list`：查看远程版本和当前版本。
@@ -70,10 +70,10 @@ npm install -g ssh-release
 安装后在需要发布文件的项目目录中执行：
 
 ```bash
-ssh-release init --template static-site
+ssh-release init --interactive
 ```
 
-发布单个构建产物文件时可使用 `ssh-release init --template single-file`。
+也可以跳过交互直接使用模板：`ssh-release init --template static-site` 或 `ssh-release init --template single-file`。
 
 查看帮助和版本：
 
@@ -111,6 +111,12 @@ node dist/cli.js init
 ## 配置初始化
 
 在需要发布文件的项目目录中执行：
+
+```bash
+ssh-release init --interactive
+```
+
+也可以直接使用模板：
 
 ```bash
 ssh-release init --template static-site

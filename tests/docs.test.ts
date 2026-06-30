@@ -50,6 +50,7 @@ test('documents stable CLI, JSON, config, and safety contracts for 1.0', async (
 
   assert.match(guide, /1\.0\.0/);
   assert.match(guide, /ssh-release init \[--template default\|single-file\|static-site\]/);
+  assert.match(guide, /ssh-release init --interactive/);
   assert.match(guide, /ssh-release deploy --json --progress/);
   assert.match(guide, /ssh-release rollback \[version\] --json --progress/);
   assert.match(guide, /ssh-release deploy --plan/);
@@ -86,6 +87,7 @@ test('documents first release setup and platform dependencies', async () => {
   );
   const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');
 
+  assert.match(quickStart, /ssh-release init --interactive/);
   assert.match(quickStart, /ssh-release init --template static-site/);
   assert.match(quickStart, /examples\/static-site/);
   assert.match(quickStart, /ssh-release doctor/);
@@ -117,6 +119,7 @@ test('documents first release setup and platform dependencies', async () => {
   assert.match(readme, /docs\/quick-start\.md/);
   assert.match(readme, /docs\/platform-requirements\.md/);
   assert.match(readme, /已发布到 npm/);
+  assert.match(readme, /ssh-release init --interactive/);
   assert.doesNotMatch(readme, /发布到 npm 后，可以在任意项目中全局安装/);
 });
 

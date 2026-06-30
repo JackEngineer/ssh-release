@@ -36,6 +36,7 @@ test('prints help and version without running command handlers', async () => {
   }), 0);
 
   assert.equal(stdout.some((line) => line.includes('ssh-release init [--template default|single-file|static-site]')), true);
+  assert.equal(stdout.some((line) => line.includes('ssh-release init --interactive [--config <path>]')), true);
   assert.equal(stdout.some((line) => line.includes('ssh-release deploy --dry-run')), true);
   assert.equal(stdout.some((line) => line.includes('ssh-release deploy --plan')), true);
   assert.equal(stdout.some((line) => line.includes('ssh-release rollback [version] --dry-run')), true);
@@ -238,6 +239,115 @@ test('init writes a named config template', async (t) => {
   assert.equal(stdout.includes('已使用模板 static-site'), true);
 });
 
+test('init interactive writes answered config and GitHub Actions workflow', async (t) => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'ssh-release-interactive-'));
+  const previousCwd = process.cwd();
+  t.after(async () => {
+    process.chdir(previousCwd);
+    await rm(tempDir, { force: true, recursive: true });
+  });
+  process.chdir(tempDir);
+
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const questions: string[] = [];
+  const answers = [
+    'single-file',
+    './Build/App.tar.gz',
+    '/var/www/My-Artifacts',
+    'private-key',
+    '~/.ssh/Deploy_Key',
+    'yes',
+  ];
+
+  assert.equal(await runCli(['init', '--interactive'], {
+    io: {
+      log: (message: string) => stdout.push(message),
+      error: (message: string) => stderr.push(message),
+      prompt: async (question: string) => {
+        questions.push(question);
+        return answers.shift() ?? '';
+      },
+    },
+  }), 0);
+
+  const config = await readFile('ssh-release.config.ts', 'utf8');
+  const workflow = await readFile('.github/workflows/ssh-release-deploy.yml', 'utf8');
+
+  assert.equal(answers.length, 0);
+  assert.equal(questions.some((question) => question.includes('发布内容类型')), true);
+  assert.match(config, /path: '\.\/Build\/App\.tar\.gz'/);
+  assert.match(config, /path: '\/var\/www\/My-Artifacts'/);
+  assert.match(config, /privateKeyPath: process\.env\.SSH_RELEASE_PRIVATE_KEY_PATH \|\| '~\/\.ssh\/Deploy_Key'/);
+  assert.doesNotMatch(config, /password:/);
+  assert.match(workflow, /actions\/checkout@v6/);
+  assert.match(workflow, /actions\/setup-node@v6/);
+  assert.match(workflow, /SSH_RELEASE_PRIVATE_KEY: \$\{\{ secrets\.SSH_RELEASE_PRIVATE_KEY \}\}/);
+  assert.match(workflow, /SSH_RELEASE_PRIVATE_KEY_PATH: ~\/\.ssh\/ssh-release/);
+  assert.doesNotMatch(workflow, /SSH_RELEASE_PASSWORD/);
+  assert.equal(stdout.includes('已创建 ssh-release.config.ts'), true);
+  assert.equal(stdout.includes('已创建 .github/workflows/ssh-release-deploy.yml'), true);
+  assert.deepEqual(stderr, []);
+});
+
+test('init interactive accepts defaults and password auth without workflow', async (t) => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'ssh-release-interactive-default-'));
+  const previousCwd = process.cwd();
+  t.after(async () => {
+    process.chdir(previousCwd);
+    await rm(tempDir, { force: true, recursive: true });
+  });
+  process.chdir(tempDir);
+
+  const stdout: string[] = [];
+  const answers = ['', '', '', '', ''];
+
+  assert.equal(await runCli(['init', '--interactive'], {
+    io: {
+      log: (message: string) => stdout.push(message),
+      error: () => undefined,
+      prompt: async () => answers.shift() ?? '',
+    },
+  }), 0);
+
+  const config = await readFile('ssh-release.config.ts', 'utf8');
+
+  assert.match(config, /path: '\.\/dist'/);
+  assert.match(config, /path: '\/var\/www\/my-app'/);
+  assert.match(config, /password: process\.env\.SSH_RELEASE_PASSWORD/);
+  assert.doesNotMatch(config, /privateKeyPath:/);
+  assert.equal(stdout.includes('已创建 .github/workflows/ssh-release-deploy.yml'), false);
+});
+
+test('init interactive rejects existing workflow without writing partial config', async (t) => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'ssh-release-interactive-existing-workflow-'));
+  const previousCwd = process.cwd();
+  t.after(async () => {
+    process.chdir(previousCwd);
+    await rm(tempDir, { force: true, recursive: true });
+  });
+  process.chdir(tempDir);
+  await mkdir('.github/workflows', { recursive: true });
+  await writeFile('.github/workflows/ssh-release-deploy.yml', 'existing\n');
+
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const answers = ['', '', '', '', 'yes'];
+
+  assert.equal(await runCli(['init', '--interactive'], {
+    io: {
+      log: (message: string) => stdout.push(message),
+      error: (message: string) => stderr.push(message),
+      prompt: async () => answers.shift() ?? '',
+    },
+  }), 1);
+
+  await assert.rejects(readFile('ssh-release.config.ts', 'utf8'), /ENOENT/);
+  assert.equal(await readFile('.github/workflows/ssh-release-deploy.yml', 'utf8'), 'existing\n');
+  assert.equal(stdout.includes('已创建 ssh-release.config.ts'), false);
+  assert.equal(stderr.includes('GitHub Actions workflow 已存在: .github/workflows/ssh-release-deploy.yml。请删除或改名后重试。'), true);
+});
+
 test('init rejects unknown config templates', async () => {
   const stderr: string[] = [];
 
@@ -250,6 +360,27 @@ test('init rejects unknown config templates', async () => {
 
   assert.equal(stderr.includes('未知配置模板: unknown。可用模板: default, single-file, static-site'), true);
 });
+
+test('init rejects conflicting interactive options', async () => {
+  const stderr: string[] = [];
+
+  assert.equal(await runCli(['init', '--interactive', '--template', 'static-site'], {
+    io: {
+      log: () => undefined,
+      error: (message: string) => stderr.push(message),
+    },
+  }), 1);
+  assert.equal(await runCli(['deploy', '--interactive'], {
+    io: {
+      log: () => undefined,
+      error: (message: string) => stderr.push(message),
+    },
+  }), 1);
+
+  assert.equal(stderr.includes('--interactive 不能配合 --template 使用'), true);
+  assert.equal(stderr.includes('--interactive 仅支持 init 命令'), true);
+});
+
 
 test('passes dry-run option to deploy handler and prints deploy plan', async () => {
   const stdout: string[] = [];
