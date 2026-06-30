@@ -125,7 +125,7 @@ test('documents standardized release workflow scripts and manual release boundar
   const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');
 
   assert.match(checklist, /npm run release:preflight/);
-  assert.match(checklist, /npm run release:postcheck -- 1\.5\.0/);
+  assert.match(checklist, /npm run release:postcheck -- 1\.5\.1/);
   assert.match(checklist, /`scripts\/`：维护者发布脚本/);
   assert.match(checklist, /tarball 内容只包含 `LICENSE`、`README\.md`、`CHANGELOG\.md`、`package\.json`、`dist\/`、`examples\/` 和 `scripts\/`/);
   assert.match(checklist, /git tag -a "v\$VERSION" -m "v\$VERSION"/);

@@ -132,7 +132,7 @@ git push origin "v$VERSION"
 发布完成后验证：
 
 ```bash
-npm run release:postcheck -- 1.5.0
+npm run release:postcheck -- 1.5.1
 ```
 
 `release:postcheck` 会检查 Publish workflow、npm registry 的当前版本和 `latest`、从 npm 安装当前版本并运行 CLI 烟测、确认 GitHub Release 已存在。

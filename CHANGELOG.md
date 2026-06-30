@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.1 - 2026-06-30
+
+### Changed
+
+- 标准化发布前后检查流程，增加 `release:preflight` 和 `release:postcheck` 维护脚本。
+- 增加项目级发布 skill，固化本仓库 npm、GitHub Actions、GitHub Release 和安装烟测验收步骤。
+- npm 包发布内容增加 `scripts/`，保证维护脚本随包发布并与 `package.json` scripts 保持一致。
+
 ## 1.5.0 - 2026-06-30
 
 ### Added
