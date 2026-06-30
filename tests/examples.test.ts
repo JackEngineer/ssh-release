@@ -114,10 +114,6 @@ test('real-world static site example shows a complete business repository shape'
     new URL('../examples/real-world-static-site/package-lock.json', import.meta.url),
     'utf8',
   )) as { lockfileVersion: number; name: string };
-  const workflow = await readFile(
-    new URL('../examples/real-world-static-site/.github/workflows/deploy.yml', import.meta.url),
-    'utf8',
-  );
 
   assert.match(readme, /真实业务场景/);
   assert.match(readme, /package\.json/);
@@ -129,6 +125,11 @@ test('real-world static site example shows a complete business repository shape'
   assert.match(readme, /npm run release:plan/);
   assert.match(readme, /npm run release:rollback:plan/);
   assert.match(readme, /current -> releases\/<version>/);
+  assert.doesNotMatch(readme, /\.github\/workflows/);
+  await assert.rejects(
+    readFile(new URL('../examples/real-world-static-site/.github/workflows/deploy.yml', import.meta.url), 'utf8'),
+    /ENOENT/,
+  );
   assert.match(envExample, /^SSH_RELEASE_HOST=example\.com$/m);
   assert.match(envExample, /^SSH_RELEASE_PORT=22$/m);
   assert.match(envExample, /^SSH_RELEASE_USER=deploy$/m);
@@ -148,15 +149,7 @@ test('real-world static site example shows a complete business repository shape'
   assert.equal(packageJson.scripts['release:rollback'], 'npx --yes ssh-release rollback --json --progress');
   assert.equal(packageLock.name, 'acme-marketing-site');
   assert.equal(packageLock.lockfileVersion, 3);
-  assert.match(workflow, /environment: production/);
-  assert.match(workflow, /concurrency:/);
-  assert.match(workflow, /npm run release:doctor -- --json/);
-  assert.match(workflow, /npm run release:plan -- --json/);
-  assert.match(workflow, /npm run release:deploy/);
-  assert.match(workflow, /secrets\.SSH_RELEASE_HOST/);
-  assert.match(workflow, /secrets\.SSH_RELEASE_USER/);
-  assert.match(workflow, /secrets\.SSH_RELEASE_PASSWORD/);
-  assert.doesNotMatch(`${readme}\n${envExample}\n${workflow}\n${JSON.stringify(packageJson)}`, sensitivePattern);
+  assert.doesNotMatch(`${readme}\n${envExample}\n${JSON.stringify(packageJson)}`, sensitivePattern);
 });
 
 async function withExampleEnv(run: () => Promise<void>): Promise<void> {
