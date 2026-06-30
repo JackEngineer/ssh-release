@@ -98,6 +98,14 @@ test('real-world static site example shows a complete business repository shape'
     new URL('../examples/real-world-static-site/README.md', import.meta.url),
     'utf8',
   );
+  const envExample = await readFile(
+    new URL('../examples/real-world-static-site/.env.example', import.meta.url),
+    'utf8',
+  );
+  const gitignore = await readFile(
+    new URL('../examples/real-world-static-site/.gitignore', import.meta.url),
+    'utf8',
+  );
   const packageJson = JSON.parse(await readFile(
     new URL('../examples/real-world-static-site/package.json', import.meta.url),
     'utf8',
@@ -113,11 +121,22 @@ test('real-world static site example shows a complete business repository shape'
 
   assert.match(readme, /真实业务场景/);
   assert.match(readme, /package\.json/);
+  assert.match(readme, /\.env\.example/);
+  assert.match(readme, /cp \.env\.example \.env/);
+  assert.match(readme, /source \.env/);
   assert.match(readme, /npm run build/);
   assert.match(readme, /npm run release:doctor/);
   assert.match(readme, /npm run release:plan/);
   assert.match(readme, /npm run release:rollback:plan/);
   assert.match(readme, /current -> releases\/<version>/);
+  assert.match(envExample, /^SSH_RELEASE_HOST=example\.com$/m);
+  assert.match(envExample, /^SSH_RELEASE_PORT=22$/m);
+  assert.match(envExample, /^SSH_RELEASE_USER=deploy$/m);
+  assert.match(envExample, /^SSH_RELEASE_PASSWORD=change-me$/m);
+  assert.match(envExample, /^# SSH_RELEASE_PRIVATE_KEY_PATH=~\/\.ssh\/id_ed25519$/m);
+  assert.match(gitignore, /^\.env$/m);
+  assert.match(gitignore, /^\.env\.\*$/m);
+  assert.match(gitignore, /^!\.env\.example$/m);
   assert.equal(packageJson.scripts.build, 'node scripts/build.js');
   assert.equal(packageJson.scripts['release:doctor'], 'npx --yes ssh-release doctor');
   assert.equal(packageJson.scripts['release:plan'], 'npx --yes ssh-release deploy --plan');
@@ -134,7 +153,7 @@ test('real-world static site example shows a complete business repository shape'
   assert.match(workflow, /secrets\.SSH_RELEASE_HOST/);
   assert.match(workflow, /secrets\.SSH_RELEASE_USER/);
   assert.match(workflow, /secrets\.SSH_RELEASE_PASSWORD/);
-  assert.doesNotMatch(`${readme}\n${workflow}\n${JSON.stringify(packageJson)}`, sensitivePattern);
+  assert.doesNotMatch(`${readme}\n${envExample}\n${workflow}\n${JSON.stringify(packageJson)}`, sensitivePattern);
 });
 
 async function withExampleEnv(run: () => Promise<void>): Promise<void> {

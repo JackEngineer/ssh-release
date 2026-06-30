@@ -12,6 +12,7 @@
 ## 文件
 
 - `package.json`：业务仓库中的构建、发布和回滚命令入口。
+- `.env.example`：本地调试使用的 SSH 环境变量示例。
 - `ssh-release.config.ts`：业务仓库根目录中的发布配置。
 - `.github/workflows/deploy.yml`：业务仓库中的发布 workflow。
 - `scripts/build.js`：示例构建脚本，把 `site/` 输出到 `dist/`。
@@ -22,11 +23,14 @@
 把 `ssh-release.config.ts` 放到业务仓库根目录后，先在本地验证配置和发布计划：
 
 ```bash
-npm run build
+cp .env.example .env
+# 编辑 .env，填入真实 SSH_RELEASE_HOST、SSH_RELEASE_USER 和认证信息。
 
-export SSH_RELEASE_HOST=example.com
-export SSH_RELEASE_USER=deploy
-export SSH_RELEASE_PASSWORD='your-password'
+set -a
+source .env
+set +a
+
+npm run build
 
 npm run release:doctor
 npm run release:plan
