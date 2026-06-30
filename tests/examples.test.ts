@@ -21,6 +21,11 @@ const examples = [
     sourcePath: './dist',
     targetPath: '/var/www/example-ci-app',
   },
+  {
+    name: 'real-world-static-site',
+    sourcePath: './dist',
+    targetPath: '/var/www/acme-marketing-site',
+  },
 ];
 
 const sensitivePattern = new RegExp([
@@ -38,6 +43,7 @@ test('README exposes a short path to runnable examples', async () => {
   assert.match(readme, /examples\/static-site/);
   assert.match(readme, /examples\/single-file/);
   assert.match(readme, /examples\/github-actions/);
+  assert.match(readme, /examples\/real-world-static-site/);
   assert.match(readme, /ssh-release init --template static-site/);
   assert.doesNotMatch(readme, /^cp examples\/static-site\/ssh-release\.config\.ts/m);
   assert.doesNotMatch(readme, /raw\.githubusercontent\.com\/JackEngineer\/ssh-release\/main\/examples\/static-site\/ssh-release\.config\.ts/);
@@ -85,6 +91,33 @@ test('GitHub Actions example keeps deploy credentials in secrets', async () => {
   assert.match(workflow, /secrets\.SSH_RELEASE_PASSWORD/);
   assert.doesNotMatch(workflow, /actions\/checkout@v4|actions\/setup-node@v4|node-version: 20/);
   assert.doesNotMatch(workflow, sensitivePattern);
+});
+
+test('real-world static site example shows a complete business repository shape', async () => {
+  const readme = await readFile(
+    new URL('../examples/real-world-static-site/README.md', import.meta.url),
+    'utf8',
+  );
+  const workflow = await readFile(
+    new URL('../examples/real-world-static-site/.github/workflows/deploy.yml', import.meta.url),
+    'utf8',
+  );
+
+  assert.match(readme, /真实业务场景/);
+  assert.match(readme, /npm run build/);
+  assert.match(readme, /npx ssh-release doctor/);
+  assert.match(readme, /npx ssh-release deploy --plan/);
+  assert.match(readme, /npx ssh-release rollback --plan/);
+  assert.match(readme, /current -> releases\/<version>/);
+  assert.match(workflow, /environment: production/);
+  assert.match(workflow, /concurrency:/);
+  assert.match(workflow, /npx ssh-release doctor --json/);
+  assert.match(workflow, /npx ssh-release deploy --plan --json/);
+  assert.match(workflow, /npx ssh-release deploy --json --progress/);
+  assert.match(workflow, /secrets\.SSH_RELEASE_HOST/);
+  assert.match(workflow, /secrets\.SSH_RELEASE_USER/);
+  assert.match(workflow, /secrets\.SSH_RELEASE_PASSWORD/);
+  assert.doesNotMatch(`${readme}\n${workflow}`, sensitivePattern);
 });
 
 async function withExampleEnv(run: () => Promise<void>): Promise<void> {

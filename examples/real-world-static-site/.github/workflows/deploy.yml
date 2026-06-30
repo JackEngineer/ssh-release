@@ -1,0 +1,46 @@
+name: Deploy marketing site
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: acme-marketing-site-production
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Check remote environment
+        run: npx ssh-release doctor --json
+        env:
+          SSH_RELEASE_HOST: ${{ secrets.SSH_RELEASE_HOST }}
+          SSH_RELEASE_USER: ${{ secrets.SSH_RELEASE_USER }}
+          SSH_RELEASE_PASSWORD: ${{ secrets.SSH_RELEASE_PASSWORD }}
+
+      - name: Preview deploy plan
+        run: npx ssh-release deploy --plan --json
+        env:
+          SSH_RELEASE_HOST: ${{ secrets.SSH_RELEASE_HOST }}
+          SSH_RELEASE_USER: ${{ secrets.SSH_RELEASE_USER }}
+          SSH_RELEASE_PASSWORD: ${{ secrets.SSH_RELEASE_PASSWORD }}
+
+      - name: Deploy files
+        run: npx ssh-release deploy --json --progress
+        env:
+          SSH_RELEASE_HOST: ${{ secrets.SSH_RELEASE_HOST }}
+          SSH_RELEASE_USER: ${{ secrets.SSH_RELEASE_USER }}
+          SSH_RELEASE_PASSWORD: ${{ secrets.SSH_RELEASE_PASSWORD }}

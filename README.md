@@ -11,6 +11,7 @@
 - [examples/static-site](https://github.com/JackEngineer/ssh-release/blob/main/examples/static-site)：发布 `./dist` 静态站点目录。
 - [examples/single-file](https://github.com/JackEngineer/ssh-release/blob/main/examples/single-file)：发布单个构建产物文件。
 - [examples/github-actions](https://github.com/JackEngineer/ssh-release/blob/main/examples/github-actions)：在 GitHub Actions 中发布到服务器。
+- [examples/real-world-static-site](https://github.com/JackEngineer/ssh-release/blob/main/examples/real-world-static-site)：完整业务仓库形态的静态站点发布示例。
 
 最小接入流程：
 
