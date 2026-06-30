@@ -548,6 +548,14 @@ function printListResult(result: ListReleasesResult, io: CliIo): void {
 function printDoctorReport(report: DoctorReport, io: CliIo): void {
   for (const check of report.checks) {
     io.log(`[${check.status}] ${check.name}: ${check.message}`);
+
+    if (check.status === 'fail') {
+      const hint = createErrorHint('doctor', check.message);
+
+      if (hint) {
+        io.log(`下一步: ${hint}`);
+      }
+    }
   }
 }
 
@@ -651,7 +659,17 @@ function createUsageText(): string {
   ssh-release unlock [--confirm <lock-path>] [--config <path>]
   ssh-release <command> --json
   ssh-release --help
-  ssh-release --version`;
+  ssh-release --version
+
+模板:
+  default: 通用发布配置
+  static-site: 发布 ./dist 静态站点目录
+  single-file: 发布单个构建产物文件
+
+首次接入推荐:
+  ssh-release init --template static-site
+  ssh-release doctor
+  ssh-release deploy --plan`;
 }
 
 function readPackageVersion(): string {
@@ -668,7 +686,21 @@ function formatError(error: unknown): string {
 
 function createErrorHint(command: string | undefined, error: string): string | undefined {
   if (error.includes('配置文件不存在')) {
-    return '先运行 ssh-release init 生成配置文件，再填写 source.path、server 和 target.path 后执行 ssh-release doctor。';
+    return '先运行 ssh-release init --template static-site 生成配置文件；如果发布单个文件，改用 ssh-release init --template single-file。';
+  }
+
+  if (
+    error.includes('server.privateKeyPath 或 server.password 必须配置一个')
+    || error.includes('server.host 不能为空')
+    || error.includes('server.username 不能为空')
+  ) {
+    return '设置 SSH_RELEASE_HOST、SSH_RELEASE_USER，并选择 SSH_RELEASE_PASSWORD 或 SSH_RELEASE_PRIVATE_KEY_PATH；设置后运行 ssh-release doctor。';
+  }
+
+  const missingSourcePath = getMissingSourcePath(error);
+
+  if (missingSourcePath) {
+    return `先构建项目生成 ${missingSourcePath}，或修改 ssh-release.config.ts 里的 source.path 后再运行 ssh-release deploy --plan。`;
   }
 
   if (error.includes('远程已有发布任务正在运行') || error.includes('.ssh-release.lock')) {
@@ -717,6 +749,16 @@ function createErrorHint(command: string | undefined, error: string): string | u
   }
 
   return undefined;
+}
+
+function getMissingSourcePath(error: string): string | undefined {
+  const match = error.match(/(?:source\.path 不存在|本地源路径不存在): (.+)$/);
+
+  if (!match) {
+    return undefined;
+  }
+
+  return match[1];
 }
 
 if (isCliEntrypoint(import.meta.url, process.argv[1])) {

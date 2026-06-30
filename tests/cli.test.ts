@@ -40,6 +40,9 @@ test('prints help and version without running command handlers', async () => {
   assert.equal(stdout.some((line) => line.includes('ssh-release deploy --plan')), true);
   assert.equal(stdout.some((line) => line.includes('ssh-release rollback [version] --dry-run')), true);
   assert.equal(stdout.some((line) => line.includes('ssh-release rollback [version] --plan')), true);
+  assert.equal(stdout.some((line) => line.includes('模板:')), true);
+  assert.equal(stdout.some((line) => line.includes('static-site: 发布 ./dist 静态站点目录')), true);
+  assert.equal(stdout.some((line) => line.includes('首次接入推荐:')), true);
   assert.equal(stdout.includes(packageJson.version), true);
   assert.deepEqual(stderr, []);
 });
@@ -683,8 +686,50 @@ test('prints a setup hint when the config file is missing', async () => {
     ok: false,
     command: 'doctor',
     error: '配置文件不存在: ssh-release.config.ts',
-    hint: '先运行 ssh-release init 生成配置文件，再填写 source.path、server 和 target.path 后执行 ssh-release doctor。',
+    hint: '先运行 ssh-release init --template static-site 生成配置文件；如果发布单个文件，改用 ssh-release init --template single-file。',
   });
+  assert.deepEqual(stderr, []);
+});
+
+test('prints onboarding hints for failed doctor checks', async () => {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+
+  assert.equal(await runCli(['doctor'], {
+    io: {
+      log: (message: string) => stdout.push(message),
+      error: (message: string) => stderr.push(message),
+    },
+    handlers: {
+      ...createFailingHandlers(),
+      doctor: async () => ({
+        ok: false,
+        checks: [
+          {
+            name: '配置文件',
+            status: 'fail' as const,
+            message: '配置文件不存在: ssh-release.config.ts',
+          },
+          {
+            name: '本地源路径',
+            status: 'fail' as const,
+            message: '本地源路径不存在: ./dist',
+          },
+        ],
+      }),
+    },
+  }), 1);
+
+  assert.equal(stdout.includes('[fail] 配置文件: 配置文件不存在: ssh-release.config.ts'), true);
+  assert.equal(
+    stdout.includes('下一步: 先运行 ssh-release init --template static-site 生成配置文件；如果发布单个文件，改用 ssh-release init --template single-file。'),
+    true,
+  );
+  assert.equal(stdout.includes('[fail] 本地源路径: 本地源路径不存在: ./dist'), true);
+  assert.equal(
+    stdout.includes('下一步: 先构建项目生成 ./dist，或修改 ssh-release.config.ts 里的 source.path 后再运行 ssh-release deploy --plan。'),
+    true,
+  );
   assert.deepEqual(stderr, []);
 });
 
@@ -713,6 +758,51 @@ test('prints platform guidance when sshpass is missing', async () => {
     hint: '当前配置使用密码登录，本机需要安装 sshpass；macOS 可运行 brew install hudochenkov/sshpass/sshpass，Ubuntu/Debian 可运行 sudo apt-get install sshpass，Windows 和 CI 推荐改用私钥登录。',
   });
   assert.deepEqual(stderr, []);
+});
+
+test('prints onboarding hints for missing auth and source path errors', async () => {
+  const authStdout: string[] = [];
+  const sourceStdout: string[] = [];
+
+  assert.equal(await runCli(['deploy', '--json'], {
+    io: {
+      log: (message: string) => authStdout.push(message),
+      error: () => undefined,
+    },
+    handlers: {
+      ...createFailingHandlers(),
+      deploy: async () => {
+        throw new Error('server.privateKeyPath 或 server.password 必须配置一个');
+      },
+    },
+  }), 1);
+
+  assert.deepEqual(JSON.parse(authStdout[0]), {
+    ok: false,
+    command: 'deploy',
+    error: 'server.privateKeyPath 或 server.password 必须配置一个',
+    hint: '设置 SSH_RELEASE_HOST、SSH_RELEASE_USER，并选择 SSH_RELEASE_PASSWORD 或 SSH_RELEASE_PRIVATE_KEY_PATH；设置后运行 ssh-release doctor。',
+  });
+
+  assert.equal(await runCli(['deploy', '--json'], {
+    io: {
+      log: (message: string) => sourceStdout.push(message),
+      error: () => undefined,
+    },
+    handlers: {
+      ...createFailingHandlers(),
+      deploy: async () => {
+        throw new Error('source.path 不存在: ./dist');
+      },
+    },
+  }), 1);
+
+  assert.deepEqual(JSON.parse(sourceStdout[0]), {
+    ok: false,
+    command: 'deploy',
+    error: 'source.path 不存在: ./dist',
+    hint: '先构建项目生成 ./dist，或修改 ssh-release.config.ts 里的 source.path 后再运行 ssh-release deploy --plan。',
+  });
 });
 
 test('prints an actionable next step for remote lock failures', async () => {
