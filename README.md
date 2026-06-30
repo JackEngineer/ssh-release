@@ -450,6 +450,8 @@ npm install -g "$PACK_DIR"/ssh-release-"$VERSION".tgz --prefix "$PACK_DIR/prefix
 npm run release:postcheck -- <version>
 ```
 
+维护者发布脚本会随 npm 包发布，保证 `package.json` 中的 `release:*` scripts 指向存在的文件；这些脚本仍只用于本仓库发布验收，不属于业务项目接入流程。
+
 完整发布步骤见 [docs/release-checklist.md](https://github.com/JackEngineer/ssh-release/blob/main/docs/release-checklist.md)。
 
 可复制示例见 [examples/](https://github.com/JackEngineer/ssh-release/tree/main/examples)。

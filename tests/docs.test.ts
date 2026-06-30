@@ -126,11 +126,14 @@ test('documents standardized release workflow scripts and manual release boundar
 
   assert.match(checklist, /npm run release:preflight/);
   assert.match(checklist, /npm run release:postcheck -- 1\.5\.0/);
+  assert.match(checklist, /`scripts\/`：维护者发布脚本/);
+  assert.match(checklist, /tarball 内容只包含 `LICENSE`、`README\.md`、`CHANGELOG\.md`、`package\.json`、`dist\/`、`examples\/` 和 `scripts\/`/);
   assert.match(checklist, /git tag -a "v\$VERSION" -m "v\$VERSION"/);
   assert.match(checklist, /gh release create "v\$VERSION" --verify-tag/);
   assert.match(checklist, /脚本不会自动创建 tag、推送 tag、执行 npm publish 或创建 GitHub Release/);
   assert.match(readme, /npm run release:preflight/);
   assert.match(readme, /npm run release:postcheck -- <version>/);
+  assert.match(readme, /维护者发布脚本会随 npm 包发布/);
   assert.doesNotMatch(`${checklist}\n${readme}`, new RegExp([
     ['47', '114', '97', '21'].join('\\.'),
     ['xiao', 'mao', '1994'].join(''),

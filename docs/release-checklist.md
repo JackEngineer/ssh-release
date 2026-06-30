@@ -10,6 +10,7 @@
 - `package.json` 的 `version` 是本次准备发布的版本。
 - `package.json` 的 `files` 只包含 npm 包需要发布的文件。
 - `package.json` 的 `bin.ssh-release` 指向 `dist/cli.js`。
+- `scripts/`：维护者发布脚本，随 npm 包发布以保证 `package.json` 中的 `release:*` scripts 指向存在的文件。
 - 当前 npm 包名可用，或当前账号有对应包的发布权限。
 - npm 包已配置 Trusted Publisher，发布方为 GitHub Actions，仓库为 `JackEngineer/ssh-release`，workflow 文件为 `publish.yml`。
 - 不再使用长期 npm 发布 token；不要在 GitHub Secrets 中配置 `NPM_TOKEN` 用于发布。
@@ -34,8 +35,8 @@ npm run release:preflight
 
 - 命令退出码为 `0`。
 - 没有 `npm auto-corrected` 之类的自动修正警告。
-- tarball 内容只包含 `LICENSE`、`README.md`、`CHANGELOG.md`、`package.json`、`dist/` 和 `examples/`。
-- `package.json`、`README.md`、`CHANGELOG.md`、`dist/cli.js` 和 `examples/static-site/ssh-release.config.ts` 出现在 tarball 内容中。
+- tarball 内容只包含 `LICENSE`、`README.md`、`CHANGELOG.md`、`package.json`、`dist/`、`examples/` 和 `scripts/`。
+- `package.json`、`README.md`、`CHANGELOG.md`、`dist/cli.js`、`examples/static-site/ssh-release.config.ts` 和 `scripts/release-preflight.sh` 出现在 tarball 内容中。
 
 需要真实 SSH 链路验证时，按 [真实服务器 dogfood](./dogfood.md)（`docs/dogfood.md`）运行：
 
