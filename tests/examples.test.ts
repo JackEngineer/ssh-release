@@ -132,6 +132,9 @@ test('real-world static site example shows a complete business repository shape'
   assert.match(envExample, /^SSH_RELEASE_HOST=example\.com$/m);
   assert.match(envExample, /^SSH_RELEASE_PORT=22$/m);
   assert.match(envExample, /^SSH_RELEASE_USER=deploy$/m);
+  assert.match(envExample, /^# 复制本文件为 \.env，并在本地填写真实值。$/m);
+  assert.match(envExample, /^# 不要提交 \.env。$/m);
+  assert.match(envExample, /^# 认证方式二选一：密码或私钥路径。$/m);
   assert.match(envExample, /^SSH_RELEASE_PASSWORD=change-me$/m);
   assert.match(envExample, /^# SSH_RELEASE_PRIVATE_KEY_PATH=~\/\.ssh\/id_ed25519$/m);
   assert.match(gitignore, /^\.env$/m);
