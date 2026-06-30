@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.6.0 - 2026-06-30
+
+### Added
+
+- 增加 `ssh-release init --interactive`，按提示生成发布配置，并可选择生成 GitHub Actions workflow。
+- 增加完整真实静态站点示例，覆盖 `package.json` scripts、`.env.example`、构建脚本、站点源码和发布/回滚命令。
+
+### Changed
+
+- README 和快速开始文档改为优先推荐交互式初始化。
+- GitHub Actions 示例同步到 `actions/checkout@v6`、`actions/setup-node@v6` 和 Node.js 24。
+
 ## 1.5.1 - 2026-06-30
 
 ### Changed

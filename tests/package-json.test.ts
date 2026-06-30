@@ -49,10 +49,10 @@ test('declares npm publish boundaries and verification hooks', async () => {
   assert.equal(packageJson.scripts?.['release:postcheck'], 'bash scripts/release-postcheck.sh');
 });
 
-test('prepares the next patch release version', async () => {
+test('prepares the next release version', async () => {
   const packageJson = JSON.parse(
     await readFile(new URL('../package.json', import.meta.url), 'utf8'),
   ) as PackageJson;
 
-  assert.equal(packageJson.version, '1.5.1');
+  assert.equal(packageJson.version, '1.6.0');
 });
