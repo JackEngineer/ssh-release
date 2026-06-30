@@ -61,7 +61,7 @@ npm install
 
 ## 全局安装
 
-发布到 npm 后，可以在任意项目中全局安装：
+已发布到 npm，可以在任意项目中全局安装：
 
 ```bash
 npm install -g ssh-release

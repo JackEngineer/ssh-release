@@ -82,6 +82,8 @@ test('documents first release setup and platform dependencies', async () => {
   const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');
 
   assert.match(quickStart, /ssh-release init/);
+  assert.match(quickStart, /examples\/static-site/);
+  assert.match(quickStart, /raw\.githubusercontent\.com\/JackEngineer\/ssh-release\/main\/examples\/static-site\/ssh-release\.config\.ts/);
   assert.match(quickStart, /ssh-release doctor/);
   assert.match(quickStart, /ssh-release deploy --plan/);
   assert.match(quickStart, /ssh-release deploy --json --progress/);
@@ -110,4 +112,6 @@ test('documents first release setup and platform dependencies', async () => {
   ].join('|')));
   assert.match(readme, /docs\/quick-start\.md/);
   assert.match(readme, /docs\/platform-requirements\.md/);
+  assert.match(readme, /已发布到 npm/);
+  assert.doesNotMatch(readme, /发布到 npm 后，可以在任意项目中全局安装/);
 });

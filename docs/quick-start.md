@@ -8,6 +8,19 @@
 
 ```bash
 npm install -g ssh-release
+```
+
+如果要从最常见的静态站点发布配置开始，可以复制示例：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/JackEngineer/ssh-release/main/examples/static-site/ssh-release.config.ts -o ssh-release.config.ts
+```
+
+完整示例见 [`examples/static-site`](../examples/static-site)、[`examples/single-file`](../examples/single-file) 和 [`examples/github-actions`](../examples/github-actions)。
+
+也可以从内置模板初始化：
+
+```bash
 ssh-release init
 ```
 
